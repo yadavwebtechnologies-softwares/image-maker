@@ -100,7 +100,11 @@ details.rules pre{
 }
 
 /* HEADER */
-.head{ display:flex; align-items:center; gap:16px; }
+.head{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px;
+}
+.head-left{ display:flex; align-items:center; gap:16px; }
 .badge{
   background:var(--grey-soft); border:2px solid var(--grey);
   border-radius:12px; padding:12px 26px;
@@ -110,6 +114,13 @@ details.rules pre{
   background:#ffffff; border:2px solid var(--grey);
   border-radius:12px; padding:12px 26px;
   font-size:24px; font-weight:700; color:var(--muted);
+}
+.id-badge{
+  background:#ffffff; border:2px solid var(--grey);
+  border-radius:12px; padding:12px 24px;
+  font-size:24px; font-weight:800; letter-spacing:.14em;
+  color:var(--muted);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 /* QUESTION */
@@ -207,7 +218,8 @@ Rules:
 • Assamese can be inside ( ) at the end of the line,
   or after a | pipe.
 • If no Assamese is given, only English is shown.
-• Filename is auto-taken from the English question.</pre>
+• Filename is auto-taken from the English question.
+• Serial ID starts at 0026 and increments by 1 after every download.</pre>
     </details>
   </div>
 </section>
@@ -221,6 +233,22 @@ Rules:
 <script>
 const EMOJIS = ["🙏", "😅", "♥️", "👍"];
 
+/* ---------------- SERIAL ID ---------------- */
+const ID_KEY   = 'mcqImageMaker.serialId';
+const START_ID = 26;
+
+function getStoredId(){
+  const v = parseInt(localStorage.getItem(ID_KEY), 10);
+  return (Number.isFinite(v) && v >= START_ID) ? v : START_ID;
+}
+function saveId(n){
+  try { localStorage.setItem(ID_KEY, String(n)); } catch(e){}
+}
+function formatId(n){ return String(n).padStart(4, '0'); }
+
+let currentId = getStoredId();
+
+/* ---------------- DOM ---------------- */
 const capture = document.getElementById('capture');
 const scaler  = document.getElementById('scaler');
 const stage   = document.getElementById('stage');
@@ -293,7 +321,7 @@ function parseMCQ(text){
   return data;
 }
 
-/* ---------------- auto-shrink fonts to fit 1080 ---------- */
+/* ---------------- auto-shrink fonts to fit 1080 ---------------- */
 function fitFonts(){
   let m = 1;
   capture.style.setProperty('--m', '1');
@@ -309,6 +337,7 @@ function render(data){
   const qAs = data.qAs
     ? `<div class="q-as">${/^[\(（]/.test(data.qAs) ? esc(data.qAs) : '(' + esc(data.qAs) + ')'}</div>`
     : '';
+  const idStr = formatId(currentId);
 
   const opts = data.options.map((o, i) => `
     <div class="option">
@@ -321,8 +350,11 @@ function render(data){
 
   capture.innerHTML = `
     <div class="head">
-      <div class="badge">MCQ</div>
-      ${topic}
+      <div class="head-left">
+        <div class="badge">MCQ</div>
+        ${topic}
+      </div>
+      <div class="id-badge">${idStr}</div>
     </div>
     <div class="question">
       <div class="q-en">${esc(data.qEn)}</div>
@@ -386,6 +418,8 @@ genBtn.addEventListener('click', async () => {
   const label = genBtn.textContent;
   genBtn.textContent = 'Preparing…';
 
+  const usedId = formatId(currentId);
+
   try {
     await loadFonts();
 
@@ -410,10 +444,16 @@ genBtn.addEventListener('click', async () => {
       a.download = slugify(data.qEn) + '.png';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-    }, 'image/png');
 
-    msgEl.className = 'msg ok';
-    msgEl.textContent = 'Downloaded: ' + slugify(data.qEn) + '.png';
+      /* advance serial ID after successful download trigger */
+      currentId += 1;
+      saveId(currentId);
+      render(currentData);
+      fitPreview();
+
+      msgEl.className = 'msg ok';
+      msgEl.textContent = 'Downloaded ' + usedId + ' → ' + slugify(data.qEn) + '.png';
+    }, 'image/png');
 
   } catch (err) {
     console.error(err);
