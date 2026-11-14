@@ -1,0 +1,167 @@
+:root{
+  --grey:      #d7dbe0;
+  --grey-soft: #f5f7fa;
+  --ink:       #111827;
+  --muted:     #4b5563;
+}
+*{ box-sizing: border-box; }
+html, body { margin:0; padding:0; }
+body {
+  background:#eef2f7;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- TOP BAR ---------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:12px 20px;
+  background:#ffffff; border-bottom:1px solid var(--grey);
+  flex-wrap:wrap;
+}
+.title{ font-size:16px; font-weight:800; color:var(--ink); }
+.title .ratio{
+  font-size:12px; font-weight:700; color:var(--muted);
+  background:var(--grey-soft); border:1px solid var(--grey);
+  border-radius:999px; padding:4px 10px; margin-left:8px;
+}
+
+/* ---------- INPUT PANEL ---------- */
+.panel{
+  max-width:1200px; margin:18px auto 0; padding:0 20px;
+}
+.panel-inner{
+  background:#fff; border:1px solid var(--grey);
+  border-radius:12px; padding:16px 18px;
+}
+.panel label{
+  display:block; font-size:12.5px; font-weight:700;
+  color:var(--muted); margin-bottom:8px; letter-spacing:.03em;
+}
+#input{
+  width:100%; min-height:170px; resize:vertical;
+  background:#fff; color:var(--ink);
+  border:2px solid var(--grey); border-radius:12px;
+  padding:14px 16px; font: 15px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  outline:none;
+}
+#input:focus{ border-color:#16a34a; }
+
+.actions{
+  display:flex; align-items:center; gap:12px;
+  margin-top:14px; flex-wrap:wrap;
+}
+#gen{
+  background:#16a34a; color:#fff; border:0; border-radius:12px;
+  padding:13px 26px; font-size:15px; font-weight:800;
+  cursor:pointer; font-family:inherit;
+}
+#gen:disabled{ opacity:.6; cursor:wait; }
+.msg{ font-size:13px; font-weight:700; color:#b91c1c; }
+.msg.ok{ color:#15803d; }
+
+details.rules{
+  margin-top:14px; border:1px dashed var(--grey);
+  border-radius:12px; padding:10px 14px; background:var(--grey-soft);
+}
+details.rules summary{
+  cursor:pointer; font-size:13px; font-weight:800; color:var(--muted);
+}
+details.rules pre{
+  margin:10px 0 0; font-size:12.5px; line-height:1.6;
+  color:var(--ink); white-space:pre-wrap; word-break:break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---------- STAGE ---------- */
+#stage{ display:flex; justify-content:center; padding:22px 20px 40px; }
+#scaler{ position:relative; }
+
+/* ---------- THE 1920×1080 CANVAS ---------- */
+.canvas{
+  --m: 1;
+  width:1920px; height:1080px;
+  background:#ffffff; padding:60px;
+  display:flex; flex-direction:column; justify-content:space-between;
+  transform-origin: top left;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* HEADER */
+.head{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px;
+}
+.head-left{ display:flex; align-items:center; gap:16px; }
+.badge{
+  background:var(--grey-soft); border:2px solid var(--grey);
+  border-radius:12px; padding:12px 26px;
+  font-size:26px; font-weight:800; letter-spacing:.08em; color:var(--ink);
+}
+.tag{
+  background:#ffffff; border:2px solid var(--grey);
+  border-radius:12px; padding:12px 26px;
+  font-size:24px; font-weight:700; color:var(--muted);
+}
+.id-badge{
+  background:#ffffff; border:2px solid var(--grey);
+  border-radius:12px; padding:12px 24px;
+  font-size:24px; font-weight:800; letter-spacing:.14em;
+  color:var(--muted);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* QUESTION */
+.question{
+  border:3px solid var(--grey); border-radius:12px;
+  background:#ffffff; padding:38px 42px;
+}
+.q-en{
+  font-size: calc(68px * var(--m));
+  font-weight:800; line-height:1.25; color:var(--ink);
+  letter-spacing:-0.01em;
+}
+.q-as{
+  margin-top:18px;
+  font-size: calc(55px * var(--m));
+  font-weight:700; line-height:1.4; color:var(--muted);
+  font-family:"Noto Sans Bengali","Nirmala UI",system-ui,sans-serif;
+}
+
+/* OPTIONS — 2 × 2 */
+.options{ display:flex; flex-wrap:wrap; gap:24px; }
+.option{
+  width:calc(50% - 12px);
+  display:flex; align-items:center; gap:22px;
+  border:3px solid var(--grey); border-radius:12px;
+  background:#ffffff; padding:22px 26px;
+}
+.emoji{
+  flex:0 0 auto; width:78px; height:78px;
+  display:flex; align-items:center; justify-content:center;
+  font-size: calc(42px * var(--m)); line-height:1;
+  border:2px solid var(--grey); border-radius:14px;
+  background:var(--grey-soft);
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+}
+.opt-text{ flex:1; min-width:0; }
+.opt-en{
+  font-size: calc(42px * var(--m));
+  font-weight:800; line-height:1.25; color:var(--ink);
+}
+.opt-as{
+  margin-top:8px;
+  font-size: calc(38px * var(--m));
+  font-weight:700; line-height:1.35; color:var(--muted);
+  font-family:"Noto Sans Bengali","Nirmala UI",system-ui,sans-serif;
+}
+
+/* REACT BAR */
+.react-bar{
+  border:3px solid var(--grey); border-radius:12px;
+  background:var(--grey-soft); padding:28px; text-align:center;
+  font-size: calc(44px * var(--m));
+  font-weight:800; color:var(--muted); letter-spacing:.02em;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif;
+}
