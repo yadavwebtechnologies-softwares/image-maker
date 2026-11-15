@@ -1,39 +1,439 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>MCQ Image Maker</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepareKora Studio — MCQ & Thumbnail Maker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+<style>
+/* ================= APP SHELL ================= */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#eef2f7;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color:#111827;
+}
+.app-header{
+  background:#fff; border-bottom:1px solid #d7dbe0;
+  padding:12px 20px; display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:12px; position:sticky; top:0; z-index:100;
+}
+.app-header h1{margin:0; font-size:18px; font-weight:800}
+.app-header h1 span{color:#888; font-weight:700}
+.tool-tabs{
+  display:flex; gap:4px; background:#f5f7fa;
+  border:1px solid #d7dbe0; border-radius:10px; padding:4px;
+}
+.tool-tabs button{
+  border:0; background:transparent; padding:10px 18px;
+  font-size:13px; font-weight:700; color:#4b5563;
+  border-radius:8px; cursor:pointer; font-family:inherit;
+  transition:all .15s;
+}
+.tool-tabs button.active{background:#16a34a; color:#fff}
+.tool-tabs button:hover:not(.active){background:#e5e7eb}
+.tool-section{display:none}
+.tool-section.active{display:block}
+
+/* ================= MCQ IMAGE MAKER ================= */
+#tool-mcq{
+  --grey:#d7dbe0; --grey-soft:#f5f7fa;
+  --ink:#111827; --muted:#4b5563;
+}
+#tool-mcq .panel{max-width:1200px; margin:18px auto 0; padding:0 20px}
+#tool-mcq .panel-inner{
+  background:#fff; border:1px solid var(--grey);
+  border-radius:12px; padding:16px 18px;
+}
+#tool-mcq .header-row{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px; flex-wrap:wrap; gap:8px;
+}
+#tool-mcq .ratio{
+  font-size:12px; font-weight:700; color:var(--muted);
+  background:var(--grey-soft); border:1px solid var(--grey);
+  border-radius:999px; padding:4px 10px;
+}
+#tool-mcq .panel label{
+  display:block; font-size:12.5px; font-weight:700;
+  color:var(--muted); letter-spacing:.03em;
+}
+#tool-mcq #input{
+  width:100%; min-height:170px; resize:vertical;
+  background:#fff; color:var(--ink);
+  border:2px solid var(--grey); border-radius:12px;
+  padding:14px 16px;
+  font:15px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  outline:none;
+}
+#tool-mcq #input:focus{border-color:#16a34a}
+#tool-mcq .actions{
+  display:flex; align-items:center; gap:12px;
+  margin-top:14px; flex-wrap:wrap;
+}
+#tool-mcq #gen{
+  background:#16a34a; color:#fff; border:0; border-radius:12px;
+  padding:13px 26px; font-size:15px; font-weight:800;
+  cursor:pointer; font-family:inherit;
+}
+#tool-mcq #gen:disabled{opacity:.6; cursor:wait}
+#tool-mcq .msg{font-size:13px; font-weight:700; color:#b91c1c}
+#tool-mcq .msg.ok{color:#15803d}
+#tool-mcq details.rules{
+  margin-top:14px; border:1px dashed var(--grey);
+  border-radius:12px; padding:10px 14px; background:var(--grey-soft);
+}
+#tool-mcq details.rules summary{
+  cursor:pointer; font-size:13px; font-weight:800; color:var(--muted);
+}
+#tool-mcq details.rules pre{
+  margin:10px 0 0; font-size:12.5px; line-height:1.6;
+  color:var(--ink); white-space:pre-wrap; word-break:break-word;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+#tool-mcq #stage{display:flex; justify-content:center; padding:22px 20px 40px}
+#tool-mcq #scaler{position:relative}
+#tool-mcq .canvas{
+  --m:1;
+  width:1920px; height:1080px;
+  background:#fff; padding:60px;
+  display:flex; flex-direction:column; justify-content:space-between;
+  transform-origin:top left;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+#tool-mcq .canvas .head{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+}
+#tool-mcq .canvas .head-left{display:flex; align-items:center; gap:16px}
+#tool-mcq .canvas .badge{
+  background:var(--grey-soft); border:2px solid var(--grey);
+  border-radius:12px; padding:12px 26px;
+  font-size:26px; font-weight:800; letter-spacing:.08em; color:var(--ink);
+}
+#tool-mcq .canvas .tag{
+  background:#fff; border:2px solid var(--grey);
+  border-radius:12px; padding:12px 26px;
+  font-size:24px; font-weight:700; color:var(--muted);
+}
+#tool-mcq .canvas .id-badge{
+  background:#fff; border:2px solid var(--grey);
+  border-radius:12px; padding:12px 24px;
+  font-size:24px; font-weight:800; letter-spacing:.14em;
+  color:var(--muted);
+  font-family:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+#tool-mcq .canvas .question{
+  border:3px solid var(--grey); border-radius:12px;
+  background:#fff; padding:38px 42px;
+}
+#tool-mcq .canvas .q-en{
+  font-size:calc(68px * var(--m));
+  font-weight:800; line-height:1.25; color:var(--ink);
+  letter-spacing:-0.01em;
+}
+#tool-mcq .canvas .q-as{
+  margin-top:18px;
+  font-size:calc(55px * var(--m));
+  font-weight:700; line-height:1.4; color:var(--muted);
+  font-family:"Noto Sans Bengali","Nirmala UI",system-ui,sans-serif;
+}
+#tool-mcq .canvas .options{display:flex; flex-wrap:wrap; gap:24px}
+#tool-mcq .canvas .option{
+  width:calc(50% - 12px);
+  display:flex; align-items:center; gap:22px;
+  border:3px solid var(--grey); border-radius:12px;
+  background:#fff; padding:22px 26px;
+}
+#tool-mcq .canvas .emoji{
+  flex:0 0 auto; width:78px; height:78px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:calc(42px * var(--m)); line-height:1;
+  border:2px solid var(--grey); border-radius:14px;
+  background:var(--grey-soft);
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+}
+#tool-mcq .canvas .opt-text{flex:1; min-width:0}
+#tool-mcq .canvas .opt-en{
+  font-size:calc(42px * var(--m));
+  font-weight:800; line-height:1.25; color:var(--ink);
+}
+#tool-mcq .canvas .opt-as{
+  margin-top:8px;
+  font-size:calc(38px * var(--m));
+  font-weight:700; line-height:1.35; color:var(--muted);
+  font-family:"Noto Sans Bengali","Nirmala UI",system-ui,sans-serif;
+}
+#tool-mcq .canvas .react-bar{
+  border:3px solid var(--grey); border-radius:12px;
+  background:var(--grey-soft); padding:28px; text-align:center;
+  font-size:calc(44px * var(--m));
+  font-weight:800; color:var(--muted); letter-spacing:.02em;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif;
+}
+
+/* ================= THUMBNAIL MAKER ================= */
+#tool-thumb{
+  --radius:8px;
+  --border:#62625f;
+  --background:#f7f7f5;
+  --card:#edede9;
+  --text:#202020;
+  --muted:#777;
+}
+#tool-thumb .toolbar{
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:12px;
+  max-width:1050px; margin:18px auto 0; padding:0 20px;
+}
+#tool-thumb .toolbar h2{margin:0; font-size:18px}
+#tool-thumb .controls{display:flex; flex-wrap:wrap; gap:8px}
+#tool-thumb button{
+  border:1px solid #777; border-radius:var(--radius);
+  background:#252525; color:white;
+  padding:11px 17px; font-size:14px; font-weight:600;
+  cursor:pointer; font-family:inherit;
+}
+#tool-thumb button.secondary{background:#f7f7f5; color:#222}
+#tool-thumb button.active{background:#555; color:white}
+#tool-thumb .studio{max-width:1050px; margin:auto; padding:0 20px}
+#tool-thumb .input-panel{
+  background:#fff; border:1px solid #c9c9c4;
+  border-radius:var(--radius);
+  padding:16px 20px; margin:16px 0 20px;
+}
+#tool-thumb .input-panel summary{
+  cursor:pointer; font-weight:800; font-size:15px;
+  padding:4px 0; user-select:none; list-style:none;
+}
+#tool-thumb .input-panel summary::-webkit-details-marker{display:none}
+#tool-thumb .input-panel summary::before{content:"▸ "; display:inline-block}
+#tool-thumb .input-panel[open] summary::before{content:"▾ "}
+#tool-thumb .input-panel summary:hover{color:#000}
+#tool-thumb .input-grid{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:12px 16px; margin-top:14px;
+}
+#tool-thumb .input-grid label{
+  display:flex; flex-direction:column; gap:4px;
+  font-size:11px; font-weight:700; color:#555;
+  text-transform:uppercase; letter-spacing:.6px;
+}
+#tool-thumb .input-grid label.full{grid-column:1/-1}
+#tool-thumb .input-grid input,
+#tool-thumb .input-grid textarea{
+  font-family:inherit; font-size:14px; font-weight:500;
+  padding:10px 12px; border:1px solid #c9c9c4;
+  border-radius:var(--radius); background:#fafaf8;
+  color:#222; outline:none; resize:vertical;
+}
+#tool-thumb .input-grid input:focus,
+#tool-thumb .input-grid textarea:focus{
+  border-color:#222; background:#fff;
+}
+#tool-thumb .input-grid textarea{min-height:52px}
+#tool-thumb .input-grid .hint{
+  display:block; font-size:10px; color:#888; font-weight:500;
+  margin-top:2px; text-transform:none; letter-spacing:0; font-style:italic;
+}
+#tool-thumb .preview-area{
+  width:100%; display:flex; justify-content:center;
+  overflow:hidden; padding-bottom:40px;
+}
+#tool-thumb .banner{
+  position:relative; flex-shrink:0;
+  background:var(--background); color:var(--text);
+  overflow:hidden; container-type:inline-size; isolation:isolate;
+}
+#tool-thumb .banner::before{
+  content:""; position:absolute; inset:5px;
+  border:1px solid var(--border); border-radius:var(--radius);
+  pointer-events:none; z-index:10;
+}
+#tool-thumb .banner-inner{
+  position:relative; z-index:1; width:100%; height:100%;
+  min-width:0; min-height:0; display:flex; flex-direction:column;
+}
+#tool-thumb .brand-row{
+  display:flex; justify-content:space-between; align-items:center;
+  gap:10px; width:100%; min-width:0;
+  padding-bottom:4%; border-bottom:1px solid #d6d6d2;
+}
+#tool-thumb .brand{
+  font-size:5.5cqw; font-weight:800;
+  letter-spacing:-1.3px; white-space:nowrap;
+}
+#tool-thumb .brand span{color:#777}
+#tool-thumb .test-id{
+  border:1px solid #d0d0cc; border-radius:var(--radius);
+  padding:2.5% 4%; font-size:3.2cqw;
+  white-space:nowrap; color:#555;
+}
+#tool-thumb .heading-row{
+  display:grid; grid-template-columns:1.15fr 1fr;
+  align-items:center; gap:5%;
+  width:100%; min-width:0;
+}
+#tool-thumb .heading-left,
+#tool-thumb .heading-right{min-width:0}
+#tool-thumb .heading-left small,
+#tool-thumb .heading-right small{
+  display:block; color:var(--muted);
+  font-size:3.8cqw; font-weight:700; margin-bottom:4%;
+}
+#tool-thumb .heading-left h1{
+  margin:0; font-size:9.5cqw; line-height:1.02;
+  letter-spacing:-1.5px; font-weight:800;
+}
+#tool-thumb .heading-right{
+  border-left:1px solid #d4d4d0; padding-left:10%;
+}
+#tool-thumb .heading-right strong{
+  display:block; font-size:5.5cqw;
+  line-height:1.08; letter-spacing:-.5px;
+}
+#tool-thumb .question-card{
+  flex:1; min-height:0; width:100%;
+  background:var(--card); border:1px solid #d9d9d4;
+  border-radius:var(--radius); padding:5%;
+  display:flex; flex-direction:column; justify-content:center; overflow:hidden;
+}
+#tool-thumb .question-label{
+  color:var(--muted); font-size:3.9cqw; font-weight:700;
+  margin-bottom:3%; letter-spacing:.2px;
+}
+#tool-thumb .question-text{
+  font-size:5.1cqw; line-height:1.22;
+  font-weight:800; margin:0 0 4%; letter-spacing:-.3px;
+}
+#tool-thumb .options{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:1.5%; width:100%;
+}
+#tool-thumb .option{
+  min-width:0; background:#fafaf9;
+  border:1px solid #d9d9d5; border-radius:var(--radius);
+  padding:3.3% 4%; display:flex; align-items:center; gap:7px;
+  font-size:3.8cqw; font-weight:600; line-height:1.2;
+}
+#tool-thumb .option b{color:#888; flex-shrink:0}
+#tool-thumb .option span{min-width:0}
+#tool-thumb .bottom-row{
+  width:100%; display:grid;
+  grid-template-columns:1fr 1fr .62fr;
+  gap:2.5%; align-items:center;
+}
+#tool-thumb .stat-card{
+  background:#eaeae6; border:1px solid #d7d7d2;
+  border-radius:var(--radius); padding:9% 8%; min-width:0;
+}
+#tool-thumb .stat-card small{
+  display:block; font-size:3.5cqw; font-weight:700;
+  color:var(--muted); margin-bottom:6%;
+}
+#tool-thumb .stat-card strong{
+  display:block; font-size:7cqw; line-height:1;
+  white-space:nowrap;
+}
+#tool-thumb .qr-area{min-width:0; text-align:center}
+#tool-thumb .qr-frame{
+  width:100%; aspect-ratio:1;
+  background:white; border:1px solid #d2d2ce;
+  border-radius:var(--radius); padding:7%;
+  display:flex; align-items:center; justify-content:center;
+}
+#tool-thumb .qr-image{
+  display:block; width:100%; height:100%; object-fit:contain;
+}
+#tool-thumb .qr-caption{
+  margin-top:6%; font-size:2.8cqw; font-weight:800;
+  color:#555; white-space:nowrap;
+}
+#tool-thumb .footer{
+  border-top:1px solid #d6d6d2; padding-top:3%;
+  display:flex; justify-content:space-between; align-items:center;
+  gap:8px; width:100%; font-size:3.5cqw;
+}
+#tool-thumb .footer strong{font-weight:800}
+#tool-thumb .footer span{color:#777; text-align:right}
+#tool-thumb .banner.portrait{width:min(100%, 420px); aspect-ratio:9/16; padding:6.5%}
+#tool-thumb .portrait .banner-inner{gap:3.1%}
+#tool-thumb .banner.landscape{width:min(100%, 960px); aspect-ratio:16/9; padding:3.5%}
+#tool-thumb .landscape .banner-inner{
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr) auto auto;
+  gap:1.5%;
+}
+#tool-thumb .landscape .brand{font-size:3cqw}
+#tool-thumb .landscape .test-id{font-size:1.7cqw; padding:1.5% 3%}
+#tool-thumb .landscape .brand-row{padding-bottom:2%}
+#tool-thumb .landscape .heading-row{grid-template-columns:1fr 1fr; gap:4%}
+#tool-thumb .landscape .heading-left small,
+#tool-thumb .landscape .heading-right small{font-size:1.8cqw; margin-bottom:1%}
+#tool-thumb .landscape .heading-left h1{font-size:4.3cqw; line-height:1}
+#tool-thumb .landscape .heading-right{padding-left:7%}
+#tool-thumb .landscape .heading-right strong{font-size:2.8cqw; line-height:1.05}
+#tool-thumb .landscape .question-card{
+  width:100%; height:100%; min-height:0;
+  padding:2.5%; justify-content:center; overflow:hidden;
+}
+#tool-thumb .landscape .question-label{font-size:1.8cqw; margin-bottom:1%}
+#tool-thumb .landscape .question-text{font-size:2.65cqw; line-height:1.15; margin-bottom:2%}
+#tool-thumb .landscape .options{grid-template-columns:1fr 1fr; column-gap:1.5%; row-gap:3%}
+#tool-thumb .landscape .option{font-size:1.75cqw; line-height:1.1; padding:1.3% 2%; gap:7px}
+#tool-thumb .landscape .bottom-row{grid-template-columns:1fr 1fr .32fr; gap:2%}
+#tool-thumb .landscape .stat-card{padding:3% 4%}
+#tool-thumb .landscape .stat-card small{font-size:1.7cqw; margin-bottom:3%}
+#tool-thumb .landscape .stat-card strong{font-size:3.2cqw}
+#tool-thumb .landscape .qr-frame{width:75%; margin:auto; padding:5%}
+#tool-thumb .landscape .qr-caption{font-size:1.25cqw; margin-top:3%}
+#tool-thumb .landscape .footer{font-size:1.7cqw; padding-top:1.5%}
+
+@media(max-width:600px){
+  body{padding:8px}
+  .app-header{padding:10px 12px}
+  .app-header h1{font-size:16px}
+  .tool-tabs button{padding:9px 14px; font-size:12px}
+  #tool-thumb .input-grid{grid-template-columns:1fr}
+  #tool-thumb .banner.landscape{width:100%}
+}
+</style>
 </head>
 <body>
 
-<header class="topbar">
-  <div class="title">MCQ Image Maker <span class="ratio">16 : 9 · 1920 × 1080 PNG</span></div>
+<header class="app-header">
+  <h1>PrepareKora Studio<span>.in</span></h1>
+  <div class="tool-tabs">
+    <button class="tab active" data-tool="mcq" onclick="switchTool('mcq')">MCQ Image Maker</button>
+    <button class="tab" data-tool="thumb" onclick="switchTool('thumb')">Thumbnail Maker</button>
+  </div>
 </header>
 
-<section class="panel">
-  <div class="panel-inner">
-    <label for="input">Paste MCQ (format rules below)</label>
-    <textarea id="input" spellcheck="false">Topic: Assam GK · Chief Ministers
+<!-- ===================== MCQ IMAGE MAKER ===================== -->
+<section id="tool-mcq" class="tool-section active">
+  <div class="panel">
+    <div class="panel-inner">
+      <div class="header-row">
+        <label for="input" style="margin:0">Paste MCQ</label>
+        <span class="ratio">16 : 9 · 1920 × 1080 PNG</span>
+      </div>
+      <textarea id="input" spellcheck="false">Topic: Assam GK · Chief Ministers
 Q: Who was the Chief Minister of Assam immediately after Gopinath Bardoloi? (গোপীনাথ বৰদলৈৰ ঠিক পিছত অসমৰ মুখ্যমন্ত্ৰী কোন আছিল?)
 A) Bimala Prasad Chaliha (বিমলা প্ৰসাদ চলিহা)
 B) Sarat Chandra Singha (সৰত চন্দ্ৰ সিংহ)
 C) Bishnuram Medhi (বিষ্ণুৰাম মেধি)
 D) Golap Borbora (গোলাপ বৰবৰা)</textarea>
-
-    <div class="actions">
-      <button id="gen">Generate &amp; Download PNG</button>
-      <span class="msg" id="msg"></span>
-    </div>
-
-    <details class="rules">
-      <summary>Input rules — how to paste</summary>
-      <pre>One item per line. Order does not matter.
+      <div class="actions">
+        <button id="gen">Generate &amp; Download PNG</button>
+        <span class="msg" id="msg"></span>
+      </div>
+      <details class="rules">
+        <summary>Input rules — how to paste</summary>
+        <pre>One item per line. Order does not matter.
 
 Topic: Assam GK · Chief Ministers        (optional tag)
 
@@ -52,257 +452,536 @@ Rules:
 • If no Assamese is given, only English is shown.
 • Filename is auto-taken from the English question.
 • Serial ID starts at 0026 and increments by 1 after every download.</pre>
+      </details>
+    </div>
+  </div>
+  <main id="stage">
+    <div id="scaler">
+      <div class="canvas" id="capture"></div>
+    </div>
+  </main>
+</section>
+
+<!-- ===================== THUMBNAIL MAKER ===================== -->
+<section id="tool-thumb" class="tool-section">
+  <div class="toolbar">
+    <h2>Thumbnail Maker</h2>
+    <div class="controls">
+      <button id="portraitBtn" class="active" onclick="setFormat('portrait')">9:16 Portrait</button>
+      <button id="landscapeBtn" class="secondary" onclick="setFormat('landscape')">16:9 Landscape</button>
+      <button onclick="downloadBanner()">Download PNG</button>
+      <button class="secondary" onclick="resetDefaults()">Reset</button>
+    </div>
+  </div>
+  <div class="studio">
+    <details class="input-panel" open>
+      <summary>Content Input — Auto-saves · Live preview</summary>
+      <div class="input-grid">
+        <label>MT ID<input id="in-mtId" type="text" placeholder="ADR/GK/01/022"></label>
+        <label>Subject<input id="in-subject" type="text" placeholder="GENERAL KNOWLEDGE"></label>
+        <label class="full">Title
+          <textarea id="in-title" placeholder="Important&#10;MCQs"></textarea>
+          <span class="hint">Use Enter for line break</span>
+        </label>
+        <label>Exam Type<input id="in-examType" type="text" placeholder="MOCK EXAMINATION"></label>
+        <label>Questions<input id="in-questions" type="text" placeholder="120"></label>
+        <label class="full">Exam Name
+          <textarea id="in-examName" placeholder="ADRE&#10;General&#10;Knowledge"></textarea>
+          <span class="hint">Use Enter for line break</span>
+        </label>
+        <label class="full">Question
+          <textarea id="in-question" placeholder="Who is the Education Minister of Assam?"></textarea>
+        </label>
+        <label>Option A<input id="in-optA" type="text"></label>
+        <label>Option B<input id="in-optB" type="text"></label>
+        <label>Option C<input id="in-optC" type="text"></label>
+        <label>Option D<input id="in-optD" type="text"></label>
+        <label>Time<input id="in-time" type="text" placeholder="30 Min"></label>
+        <label>QR URL<input id="in-url" type="text" placeholder="https://..."></label>
+      </div>
     </details>
+    <div class="preview-area">
+      <div class="banner portrait" id="banner">
+        <div class="banner-inner">
+          <div class="brand-row">
+            <div class="brand">PrepareKora<span>.in</span></div>
+            <div class="test-id" data-bind="mtId">MT ID: ADR/GK/01/022</div>
+          </div>
+          <div class="heading-row">
+            <div class="heading-left">
+              <small data-bind="subject">GENERAL KNOWLEDGE</small>
+              <h1 data-bind="title">Important<br>MCQs</h1>
+            </div>
+            <div class="heading-right">
+              <small data-bind="examType">MOCK EXAMINATION</small>
+              <strong data-bind="examName">ADRE<br>General<br>Knowledge</strong>
+            </div>
+          </div>
+          <div class="question-card">
+            <div class="question-label">PRACTICE QUESTION</div>
+            <p class="question-text" data-bind="question">Who is the Education Minister of Assam?</p>
+            <div class="options">
+              <div class="option"><b>A.</b><span data-bind="optA">Ranoj Pegu</span></div>
+              <div class="option"><b>B.</b><span data-bind="optB">Himanta Biswa Sarma</span></div>
+              <div class="option"><b>C.</b><span data-bind="optC">Gaurav Gogoi</span></div>
+              <div class="option"><b>D.</b><span data-bind="optD">Nitin Gadkari</span></div>
+            </div>
+          </div>
+          <div class="bottom-row">
+            <div class="stat-card"><small>QUESTIONS</small><strong data-bind="questions">120</strong></div>
+            <div class="stat-card"><small>TIME LIMIT</small><strong data-bind="time">30 Min</strong></div>
+            <div class="qr-area">
+              <div class="qr-frame"><img class="qr-image" alt="QR Code"></div>
+              <div class="qr-caption">SCAN TO START</div>
+            </div>
+          </div>
+          <div class="footer">
+            <strong>PrepareKora.in</strong>
+            <span>Learn · Practice · Succeed</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
-<main id="stage">
-  <div id="scaler">
-    <div class="canvas" id="capture"></div>
-  </div>
-</main>
-
 <script>
-const EMOJIS = ["🙏", "😅", "♥️", "👍"];
-
-/* ---------------- SERIAL ID ---------------- */
-const ID_KEY   = 'mcqImageMaker.serialId';
-const START_ID = 26;
-
-function getStoredId(){
-  const v = parseInt(localStorage.getItem(ID_KEY), 10);
-  return (Number.isFinite(v) && v >= START_ID) ? v : START_ID;
-}
-function saveId(n){
-  try { localStorage.setItem(ID_KEY, String(n)); } catch(e){}
-}
-function formatId(n){ return String(n).padStart(4, '0'); }
-
-let currentId = getStoredId();
-
-/* ---------------- DOM ---------------- */
-const capture = document.getElementById('capture');
-const scaler  = document.getElementById('scaler');
-const stage   = document.getElementById('stage');
-const inputEl = document.getElementById('input');
-const genBtn  = document.getElementById('gen');
-const msgEl   = document.getElementById('msg');
-
-let currentData = null;
-
-/* ---------------- helpers ---------------- */
-function esc(s){
-  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* ============================================================
+   TAB SWITCHING
+   ============================================================ */
+function switchTool(name) {
+  document.querySelectorAll('.tool-section').forEach(el => {
+    el.classList.toggle('active', el.id === 'tool-' + name);
+  });
+  document.querySelectorAll('.tool-tabs button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tool === name);
+  });
+  if (name === 'mcq' && window.MCQTool) setTimeout(window.MCQTool.refresh, 20);
+  if (name === 'thumb' && window.ThumbTool) window.ThumbTool.refresh();
 }
 
-function splitBi(raw){
-  let en = String(raw).trim(), as = '';
-  if (raw.includes('|')) {
-    const i = raw.indexOf('|');
-    en = raw.slice(0, i).trim();
-    as = raw.slice(i + 1).trim();
-  } else {
-    const m = raw.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
-    if (m) { en = m[1].trim(); as = m[2].trim(); }
+/* ============================================================
+   MCQ IMAGE MAKER
+   ============================================================ */
+(function initMCQ(){
+  const EMOJIS = ["🙏", "😅", "♥️", "👍"];
+  const ID_KEY = 'mcqImageMaker.serialId';
+  const START_ID = 26;
+
+  function getStoredId(){
+    const v = parseInt(localStorage.getItem(ID_KEY), 10);
+    return (Number.isFinite(v) && v >= START_ID) ? v : START_ID;
   }
-  return { en, as };
-}
+  function saveId(n){ try { localStorage.setItem(ID_KEY, String(n)); } catch(e){} }
+  function formatId(n){ return String(n).padStart(4, '0'); }
+  let currentId = getStoredId();
 
-function slugify(s){
-  return String(s)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 90) || 'mcq';
-}
+  const capture = document.getElementById('capture');
+  const scaler  = document.getElementById('scaler');
+  const stage   = document.getElementById('stage');
+  const inputEl = document.getElementById('input');
+  const genBtn  = document.getElementById('gen');
+  const msgEl   = document.getElementById('msg');
 
-/* ---------------- parser ---------------- */
-function parseMCQ(text){
-  const data = { topic:'', qEn:'', qAs:'', options:[] };
-  const map = {};
+  let currentData = null;
 
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line) continue;
-    let m;
-
-    if (m = line.match(/^topic\s*[:|-]\s*(.+)$/i)) {
-      data.topic = m[1].trim(); continue;
-    }
-
-    if (m = line.match(/^q\s*\(\s*as\s*\)\s*[:|-]\s*(.+)$/i)) {
-      data.qAs = m[1].trim(); continue;
-    }
-
-    if (m = line.match(/^(?:q|question)\s*[:|-]\s*(.+)$/i)) {
-      const b = splitBi(m[1]);
-      data.qEn = b.en;
-      if (b.as) data.qAs = b.as;
-      continue;
-    }
-
-    if (m = line.match(/^([A-Da-d])\s*[\)\.\:]\s*(.+)$/)) {
-      const L = m[1].toUpperCase();
-      const b = splitBi(m[2]);
-      map[L] = { en: b.en, as: b.as };
-      continue;
-    }
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   }
 
-  ['A','B','C','D'].forEach(L => { if (map[L]) data.options.push(map[L]); });
-  return data;
-}
-
-/* ---------------- auto-shrink fonts to fit 1080 ---------------- */
-function fitFonts(){
-  let m = 1;
-  capture.style.setProperty('--m', '1');
-  while (capture.scrollHeight > 1080 && m > 0.6) {
-    m = Math.round((m - 0.04) * 100) / 100;
-    capture.style.setProperty('--m', String(m));
+  function splitBi(raw){
+    let en = String(raw).trim(), as = '';
+    if (raw.includes('|')) {
+      const i = raw.indexOf('|');
+      en = raw.slice(0, i).trim();
+      as = raw.slice(i + 1).trim();
+    } else {
+      const m = raw.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+      if (m) { en = m[1].trim(); as = m[2].trim(); }
+    }
+    return { en, as };
   }
-}
 
-/* ---------------- render ---------------- */
-function render(data){
-  const topic = data.topic ? `<div class="tag">${esc(data.topic)}</div>` : '';
-  const qAs = data.qAs
-    ? `<div class="q-as">${/^[\(（]/.test(data.qAs) ? esc(data.qAs) : '(' + esc(data.qAs) + ')'}</div>`
-    : '';
-  const idStr = formatId(currentId);
+  function slugify(s){
+    return String(s).toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 90) || 'mcq';
+  }
 
-  const opts = data.options.map((o, i) => `
-    <div class="option">
-      <div class="emoji">${EMOJIS[i] || ''}</div>
-      <div class="opt-text">
-        <div class="opt-en">${esc(o.en)}</div>
-        ${o.as ? `<div class="opt-as">${esc(o.as)}</div>` : ''}
-      </div>
-    </div>`).join('');
-
-  capture.innerHTML = `
-    <div class="head">
-      <div class="head-left">
-        <div class="badge">MCQ</div>
-        ${topic}
-      </div>
-      <div class="id-badge">${idStr}</div>
-    </div>
-    <div class="question">
-      <div class="q-en">${esc(data.qEn)}</div>
-      ${qAs}
-    </div>
-    <div class="options">${opts}</div>
-    <div class="react-bar">React with emoji 🙏 😅 ♥️ 👍</div>
-  `;
-
-  fitFonts();
-}
-
-/* ---------------- preview scaling ---------------- */
-function fitPreview(){
-  const availW = stage.clientWidth - 40;
-  const availH = window.innerHeight - 260;
-  const scale  = Math.min(availW / 1920, availH / 1080, 1);
-  scaler.style.width  = (1920 * scale) + 'px';
-  scaler.style.height = (1080 * scale) + 'px';
-  capture.style.transform = 'scale(' + scale + ')';
-}
-window.addEventListener('resize', fitPreview);
-
-/* ---------------- live preview ---------------- */
-let t = null;
-inputEl.addEventListener('input', () => {
-  clearTimeout(t);
-  t = setTimeout(() => {
-    const d = parseMCQ(inputEl.value);
-    if (d.qEn && d.options.length) { render(d); fitPreview(); }
-  }, 250);
-});
-
-/* ---------------- fonts ---------------- */
-async function loadFonts(){
-  if (!document.fonts || !document.fonts.ready) return;
-  try {
-    await document.fonts.ready;
-    await Promise.all([
-      document.fonts.load('400 20px "Noto Sans Bengali"'),
-      document.fonts.load('700 20px "Noto Sans Bengali"'),
-      document.fonts.load('800 20px "Noto Sans Bengali"')
-    ]);
-  } catch(e) {}
-}
-
-/* ---------------- generate + auto download ---------------- */
-genBtn.addEventListener('click', async () => {
-  const data = parseMCQ(inputEl.value);
-  msgEl.className = 'msg';
-  msgEl.textContent = '';
-
-  if (!data.qEn) { msgEl.textContent = 'Missing question line (Q: ...)'; return; }
-  if (data.options.length < 2) { msgEl.textContent = 'Add at least 2 options (A / B ...)'; return; }
-
-  currentData = data;
-  render(data);
-  fitPreview();
-
-  genBtn.disabled = true;
-  const label = genBtn.textContent;
-  genBtn.textContent = 'Preparing…';
-
-  const usedId = formatId(currentId);
-
-  try {
-    await loadFonts();
-
-    const canvas = await html2canvas(capture, {
-      scale: 1,
-      width: 1920,
-      height: 1080,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-      onclone: (doc) => {
-        const c = doc.getElementById('capture');
-        if (c) c.style.transform = 'none';
-        const s = doc.getElementById('scaler');
-        if (s) { s.style.width = '1920px'; s.style.height = '1080px'; }
+  function parseMCQ(text){
+    const data = { topic:'', qEn:'', qAs:'', options:[] };
+    const map = {};
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      let m;
+      if (m = line.match(/^topic\s*[:|-]\s*(.+)$/i)) { data.topic = m[1].trim(); continue; }
+      if (m = line.match(/^q\s*\(\s*as\s*\)\s*[:|-]\s*(.+)$/i)) { data.qAs = m[1].trim(); continue; }
+      if (m = line.match(/^(?:q|question)\s*[:|-]\s*(.+)$/i)) {
+        const b = splitBi(m[1]);
+        data.qEn = b.en;
+        if (b.as) data.qAs = b.as;
+        continue;
       }
-    });
-
-    canvas.toBlob(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = slugify(data.qEn) + '.png';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-
-      /* advance serial ID after successful download trigger */
-      currentId += 1;
-      saveId(currentId);
-      render(currentData);
-      fitPreview();
-
-      msgEl.className = 'msg ok';
-      msgEl.textContent = 'Downloaded ' + usedId + ' → ' + slugify(data.qEn) + '.png';
-    }, 'image/png');
-
-  } catch (err) {
-    console.error(err);
-    msgEl.className = 'msg';
-    msgEl.textContent = 'Download failed: ' + err.message;
-  } finally {
-    genBtn.disabled = false;
-    genBtn.textContent = label;
+      if (m = line.match(/^([A-Da-d])\s*[\)\.\:]\s*(.+)$/)) {
+        const L = m[1].toUpperCase();
+        const b = splitBi(m[2]);
+        map[L] = { en: b.en, as: b.as };
+        continue;
+      }
+    }
+    ['A','B','C','D'].forEach(L => { if (map[L]) data.options.push(map[L]); });
+    return data;
   }
-});
 
-/* ---------------- first paint ---------------- */
-(function init(){
-  const d = parseMCQ(inputEl.value);
-  render(d);
-  fitPreview();
+  function fitFonts(){
+    let m = 1;
+    capture.style.setProperty('--m', '1');
+    if (capture.scrollHeight === 0) return;
+    while (capture.scrollHeight > 1080 && m > 0.6) {
+      m = Math.round((m - 0.04) * 100) / 100;
+      capture.style.setProperty('--m', String(m));
+    }
+  }
+
+  function render(data){
+    const topic = data.topic ? `<div class="tag">${esc(data.topic)}</div>` : '';
+    const qAs = data.qAs
+      ? `<div class="q-as">${/^[\(（]/.test(data.qAs) ? esc(data.qAs) : '(' + esc(data.qAs) + ')'}</div>`
+      : '';
+    const idStr = formatId(currentId);
+    const opts = data.options.map((o, i) => `
+      <div class="option">
+        <div class="emoji">${EMOJIS[i] || ''}</div>
+        <div class="opt-text">
+          <div class="opt-en">${esc(o.en)}</div>
+          ${o.as ? `<div class="opt-as">${esc(o.as)}</div>` : ''}
+        </div>
+      </div>`).join('');
+
+    capture.innerHTML = `
+      <div class="head">
+        <div class="head-left">
+          <div class="badge">MCQ</div>
+          ${topic}
+        </div>
+        <div class="id-badge">${idStr}</div>
+      </div>
+      <div class="question">
+        <div class="q-en">${esc(data.qEn)}</div>
+        ${qAs}
+      </div>
+      <div class="options">${opts}</div>
+      <div class="react-bar">React with emoji 🙏 😅 ♥️ 👍</div>
+    `;
+    fitFonts();
+  }
+
+  function fitPreview(){
+    if (!stage.clientWidth) return;
+    const availW = stage.clientWidth - 40;
+    const availH = window.innerHeight - 260;
+    const scale = Math.min(availW / 1920, availH / 1080, 1);
+    scaler.style.width = (1920 * scale) + 'px';
+    scaler.style.height = (1080 * scale) + 'px';
+    capture.style.transform = 'scale(' + scale + ')';
+  }
+
+  let t = null;
+  inputEl.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      const d = parseMCQ(inputEl.value);
+      if (d.qEn && d.options.length) { render(d); fitPreview(); }
+    }, 250);
+  });
+
+  async function loadFonts(){
+    if (!document.fonts || !document.fonts.ready) return;
+    try {
+      await document.fonts.ready;
+      await Promise.all([
+        document.fonts.load('400 20px "Noto Sans Bengali"'),
+        document.fonts.load('700 20px "Noto Sans Bengali"'),
+        document.fonts.load('800 20px "Noto Sans Bengali"')
+      ]);
+    } catch(e) {}
+  }
+
+  genBtn.addEventListener('click', async () => {
+    const data = parseMCQ(inputEl.value);
+    msgEl.className = 'msg';
+    msgEl.textContent = '';
+    if (!data.qEn) { msgEl.textContent = 'Missing question line (Q: ...)'; return; }
+    if (data.options.length < 2) { msgEl.textContent = 'Add at least 2 options (A / B ...)'; return; }
+
+    currentData = data;
+    render(data);
+    fitPreview();
+
+    genBtn.disabled = true;
+    const label = genBtn.textContent;
+    genBtn.textContent = 'Preparing…';
+    const usedId = formatId(currentId);
+
+    try {
+      await loadFonts();
+      const canvas = await html2canvas(capture, {
+        scale: 1, width: 1920, height: 1080,
+        backgroundColor: '#ffffff', useCORS: true, logging: false,
+        onclone: (doc) => {
+          const c = doc.getElementById('capture');
+          if (c) c.style.transform = 'none';
+          const s = doc.getElementById('scaler');
+          if (s) { s.style.width = '1920px'; s.style.height = '1080px'; }
+        }
+      });
+      canvas.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = slugify(data.qEn) + '.png';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        currentId += 1;
+        saveId(currentId);
+        render(currentData);
+        fitPreview();
+        msgEl.className = 'msg ok';
+        msgEl.textContent = 'Downloaded ' + usedId + ' → ' + slugify(data.qEn) + '.png';
+      }, 'image/png');
+    } catch (err) {
+      console.error(err);
+      msgEl.className = 'msg';
+      msgEl.textContent = 'Download failed: ' + err.message;
+    } finally {
+      genBtn.disabled = false;
+      genBtn.textContent = label;
+    }
+  });
+
+  window.addEventListener('resize', fitPreview);
+
+  const d0 = parseMCQ(inputEl.value);
+  render(d0);
+  setTimeout(fitPreview, 50);
+
+  window.MCQTool = {
+    refresh(){
+      const data = parseMCQ(inputEl.value);
+      if (data.qEn && data.options.length) {
+        render(data);
+        setTimeout(fitPreview, 20);
+      }
+    }
+  };
 })();
+
+/* ============================================================
+   THUMBNAIL MAKER
+   ============================================================ */
+const DEFAULT_DATA = {
+  mtId: 'ADR/GK/01/022',
+  subject: 'GENERAL KNOWLEDGE',
+  title: 'Important\nMCQs',
+  examType: 'MOCK EXAMINATION',
+  examName: 'ADRE\nGeneral\nKnowledge',
+  question: 'Who is the Education Minister of Assam?',
+  optA: 'Ranoj Pegu',
+  optB: 'Himanta Biswa Sarma',
+  optC: 'Gaurav Gogoi',
+  optD: 'Nitin Gadkari',
+  questions: '120',
+  time: '30 Min',
+  url: 'https://chat.whatsapp.com/DLrcA98MrlYKOeZ5DMeN5Z?s=cl&p=a&iam=2'
+};
+
+const INPUT_MAP = {
+  'in-mtId':'mtId', 'in-subject':'subject', 'in-title':'title',
+  'in-examType':'examType', 'in-examName':'examName',
+  'in-question':'question',
+  'in-optA':'optA', 'in-optB':'optB', 'in-optC':'optC', 'in-optD':'optD',
+  'in-questions':'questions', 'in-time':'time', 'in-url':'url'
+};
+
+let thumbState = { ...DEFAULT_DATA };
+let lastQRUrl = '';
+
+const thumbBanner = document.getElementById('banner');
+const thumbPortraitBtn = document.getElementById('portraitBtn');
+const thumbLandscapeBtn = document.getElementById('landscapeBtn');
+
+function loadSaved(){
+  try {
+    const saved = JSON.parse(localStorage.getItem('pk_banner_state') || 'null');
+    if (saved && typeof saved === 'object') thumbState = { ...DEFAULT_DATA, ...saved };
+  } catch(e){}
+}
+function saveThumbState(){
+  try { localStorage.setItem('pk_banner_state', JSON.stringify(thumbState)); } catch(e){}
+}
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function nl2br(s){ return escapeHtml(s ?? '').split('\n').join('<br>'); }
+function setText(bind, text){
+  const el = document.querySelector('[data-bind="' + bind + '"]');
+  if (el) el.textContent = text ?? '';
+}
+function setHtml(bind, html){
+  const el = document.querySelector('[data-bind="' + bind + '"]');
+  if (el) el.innerHTML = html ?? '';
+}
+
+function renderThumb(){
+  setText('mtId', 'MT ID: ' + (thumbState.mtId || ''));
+  setText('subject', thumbState.subject);
+  setHtml('title', nl2br(thumbState.title));
+  setText('examType', thumbState.examType);
+  setHtml('examName', nl2br(thumbState.examName));
+  setText('question', thumbState.question);
+  setText('optA', thumbState.optA);
+  setText('optB', thumbState.optB);
+  setText('optC', thumbState.optC);
+  setText('optD', thumbState.optD);
+  setText('questions', thumbState.questions);
+  setText('time', thumbState.time);
+  updateThumbQR();
+}
+
+function updateThumbQR(){
+  const url = (thumbState.url || '').trim();
+  const img = thumbBanner.querySelector('.qr-image');
+  if (!img) return;
+  if (!url) { img.removeAttribute('src'); return; }
+  const qrSrc = 'https://quickchart.io/qr?text=' +
+    encodeURIComponent(url) +
+    '&size=500&margin=2&ecLevel=H&dark=111111&light=ffffff';
+  if (qrSrc === lastQRUrl) return;
+  lastQRUrl = qrSrc;
+  img.crossOrigin = 'anonymous';
+  img.src = qrSrc;
+}
+
+function populateThumbInputs(){
+  for (const [id, key] of Object.entries(INPUT_MAP)) {
+    const el = document.getElementById(id);
+    if (el) el.value = thumbState[key] ?? '';
+  }
+}
+
+function bindThumbInputs(){
+  for (const [id, key] of Object.entries(INPUT_MAP)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.addEventListener('input', () => {
+      thumbState[key] = el.value;
+      saveThumbState();
+      renderThumb();
+    });
+  }
+}
+
+function setFormat(format){
+  thumbBanner.classList.remove('portrait', 'landscape');
+  thumbBanner.classList.add(format);
+  thumbPortraitBtn.classList.toggle('active', format === 'portrait');
+  thumbPortraitBtn.classList.toggle('secondary', format !== 'portrait');
+  thumbLandscapeBtn.classList.toggle('active', format === 'landscape');
+  thumbLandscapeBtn.classList.toggle('secondary', format !== 'landscape');
+}
+
+function waitForQR(){
+  const img = thumbBanner.querySelector('.qr-image');
+  if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('QR timeout — check internet')), 12000);
+    img.onload = () => { clearTimeout(t); resolve(); };
+    img.onerror = () => { clearTimeout(t); reject(new Error('QR failed to load')); };
+  });
+}
+
+async function downloadBanner(){
+  const isPortrait = thumbBanner.classList.contains('portrait');
+  const cssWidth = isPortrait ? 360 : 960;
+  const cssHeight = isPortrait ? 640 : 540;
+  const outputWidth = isPortrait ? 1080 : 1920;
+  const outputHeight = isPortrait ? 1920 : 1080;
+  let clone;
+  try {
+    if (typeof html2canvas !== 'function') throw new Error('PNG library not loaded. Refresh page.');
+    await waitForQR();
+    clone = thumbBanner.cloneNode(true);
+    clone.style.width = cssWidth + 'px';
+    clone.style.height = cssHeight + 'px';
+    clone.style.maxWidth = 'none';
+    clone.style.minWidth = '0';
+    clone.style.aspectRatio = 'auto';
+    clone.style.position = 'fixed';
+    clone.style.left = '-10000px';
+    clone.style.top = '0';
+    clone.style.margin = '0';
+    clone.style.transform = 'none';
+    document.body.appendChild(clone);
+    const img = clone.querySelector('.qr-image');
+    if (img && !(img.complete && img.naturalWidth > 0)) {
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = () => rej(new Error('QR failed in clone'));
+      });
+    }
+    const canvas = await html2canvas(clone, {
+      backgroundColor: '#f7f7f5',
+      scale: outputWidth / cssWidth,
+      width: cssWidth, height: cssHeight,
+      windowWidth: cssWidth, windowHeight: cssHeight,
+      useCORS: true, allowTaint: false, logging: false
+    });
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = outputWidth;
+    finalCanvas.height = outputHeight;
+    finalCanvas.getContext('2d').drawImage(canvas, 0, 0, outputWidth, outputHeight);
+    const blob = await new Promise(r => finalCanvas.toBlob(r, 'image/png'));
+    if (!blob) throw new Error('PNG creation failed');
+    const fmt = isPortrait ? '9x16' : '16x9';
+    const safeId = (thumbState.mtId || 'banner').replace(/[^a-zA-Z0-9-]/g, '-');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'PrepareKora_' + safeId + '_' + fmt + '.png';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+  } catch (error) {
+    alert(error.message || 'Unable to export banner.');
+    console.error(error);
+  } finally {
+    if (clone && clone.parentNode) clone.remove();
+  }
+}
+
+function resetDefaults(){
+  if (!confirm('Reset all fields to default example?')) return;
+  thumbState = { ...DEFAULT_DATA };
+  saveThumbState();
+  populateThumbInputs();
+  renderThumb();
+}
+
+loadSaved();
+populateThumbInputs();
+bindThumbInputs();
+renderThumb();
+setFormat('portrait');
+
+window.ThumbTool = {
+  refresh(){
+    renderThumb();
+    void thumbBanner.offsetWidth;
+  }
+};
 </script>
 </body>
 </html>
