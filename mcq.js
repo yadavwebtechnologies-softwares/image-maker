@@ -1,7 +1,7 @@
 /* ================================================================
-   mcq.js — PrepareKora MCQ Paper Builder (v2 — bilingual A4 layout)
-   PDF generation: HTML render → html2canvas per page → jsPDF image.
-   (jsPDF vector text cannot shape Bengali conjuncts correctly.)
+   mcq.js — PrepareKora MCQ Paper Builder (v3 — digital text PDF)
+   PDF is produced via browser print-to-PDF (window.print) so
+   Bengali conjuncts shape correctly and text stays selectable.
    ================================================================ */
 (function initMCQ(global){
   'use strict';
@@ -326,17 +326,37 @@
     }));
   }
 
-  /* ---------------- PDF GENERATOR ---------------- */
+  /* ---------------- DIGITAL PDF VIA PRINT ---------------- */
+
+  function buildPrintDocument(sheetsHtml, title){
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+      '<title>' + escHtml(title || 'MCQ Paper') + '</title>' +
+      '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">' +
+      '<style>' +
+        '@page { size: A4 portrait; margin: 0; }' +
+        'html, body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+        PDF_CSS +
+        '.pk-pdf-root { position: static !important; left: auto !important; top: auto !important; z-index: auto !important; pointer-events: auto !important; }' +
+        '.pk-pdf-root .sheet { page-break-after: always; break-after: page; box-shadow: none; }' +
+        '.pk-pdf-root .sheet:last-child { page-break-after: auto; break-after: auto; }' +
+      '</style></head><body><div class="pk-pdf-root">' +
+      sheetsHtml +
+      '</div></body></html>';
+  }
 
   async function generatePDF(testData, onProgress){
-    if(typeof global.html2canvas !== 'function'){
-      throw new Error('Rendering library not loaded. Refresh page.');
-    }
-    if(!global.jspdf || !global.jspdf.jsPDF){
-      throw new Error('PDF library not loaded. Refresh page.');
-    }
-
     ensurePdfStyles();
+
+    /* Open print window SYNCHRONOUSLY to survive popup blockers. */
+    const printWin = global.open('', '_blank');
+    if(!printWin){
+      throw new Error('Popup blocked. Allow popups for this site, then click Create again.');
+    }
+    printWin.document.write(
+      '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;color:#333">' +
+      'Preparing digital PDF… please wait.</body></html>'
+    );
+    printWin.document.close();
 
     const perPage = 5;
     const total = testData.questions.length;
@@ -354,70 +374,46 @@
     document.body.appendChild(root);
 
     try{
+      if(typeof onProgress === 'function') onProgress('preparing');
       await waitForFonts();
       await waitForImages(root);
-      await new Promise(function(r){ setTimeout(r, 80); });
+      await new Promise(function(r){ setTimeout(r, 120); });
 
-      const doc = new global.jspdf.jsPDF({
-        unit: 'mm', format: 'a4', orientation: 'portrait'
+      const sheetsHtml = root.innerHTML;
+
+      printWin.document.open();
+      printWin.document.write(buildPrintDocument(sheetsHtml, testData.title));
+      printWin.document.close();
+
+      /* Wait for print window resources */
+      await new Promise(function(resolve){
+        const check = function(){
+          if(printWin.document.readyState === 'complete') resolve();
+          else setTimeout(check, 100);
+        };
+        check();
       });
 
-      doc.setProperties({
-        title: testData.title || 'MCQ Paper',
-        subject: testData.subject || '',
-        author: 'PrepareKora.in',
-        creator: 'PrepareKora Studio'
-      });
+      try{ await printWin.document.fonts.ready; }catch(e){}
 
-      const sheets = root.querySelectorAll('.sheet');
-      for(let i = 0; i < sheets.length; i++){
-        if(typeof onProgress === 'function') onProgress(i + 1, sheets.length);
-
-        const canvas = await global.html2canvas(sheets[i], {
-          scale: 3,
-          backgroundColor: '#ffffff',
-          useCORS: true,
-          allowTaint: false,
-          logging: false,
-          windowWidth: sheets[i].offsetWidth,
-          windowHeight: sheets[i].offsetHeight
+      const printImgs = Array.prototype.slice.call(printWin.document.querySelectorAll('img'));
+      await Promise.all(printImgs.map(function(img){
+        return new Promise(function(resolve){
+          if(img.complete && img.naturalWidth > 0) return resolve();
+          img.onload = resolve;
+          img.onerror = resolve;
+          setTimeout(resolve, 6000);
         });
+      }));
 
-        const imgData = canvas.toDataURL('image/png');
+      await new Promise(function(r){ setTimeout(r, 300); });
 
-        if(i > 0) doc.addPage();
-        doc.addImage(imgData, 'PNG', 0, 0, 210, 297);
-      }
-
-      return doc.output('blob');
+      if(typeof onProgress === 'function') onProgress('printing');
+      printWin.focus();
+      printWin.print();
     } finally {
       if(root.parentNode) root.parentNode.removeChild(root);
     }
-  }
-
-  /* ---------------- FILE HELPERS ---------------- */
-
-  function slugify(s){
-    return String(s == null ? '' : s)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40) || 'paper';
-  }
-
-  function filenameFor(testData){
-    const id = String(testData.mtId || 'MT').replace(/[^a-z0-9]+/gi, '-');
-    return 'PrepareKora_' + id + '_' + slugify(testData.title) + '.pdf';
-  }
-
-  function downloadBlob(blob, filename){
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
   }
 
   /* ---------------- UI WIRING ---------------- */
@@ -439,8 +435,6 @@
     const sumCount    = document.getElementById('sum-count');
 
     if(!createBtn) return;
-
-    let lastPdfBlob = null;
 
     subjectSel.addEventListener('change', function(){
       customWrap.hidden = subjectSel.value !== 'Custom';
@@ -500,20 +494,19 @@
           questions: parsed.questions
         });
 
-        const blob = await generatePDF(draft, function(page, total){
-          createBtn.textContent = 'Rendering page ' + page + ' of ' + total + '…';
+        await generatePDF(draft, function(stage){
+          if(stage === 'preparing') createBtn.textContent = 'Preparing digital PDF…';
+          else if(stage === 'printing') createBtn.textContent = 'Opening print dialog…';
         });
 
         const consumedId = PKState.consumeMTId(subject);
         draft.mtId = consumedId;
 
         PKState.save(draft);
-        lastPdfBlob = blob;
-
         renderSummary(draft);
-        downloadBlob(blob, filenameFor(draft));
 
-        setMsg('PDF created · ' + draft.mtId + ' · ' + draft.totalQuestions + ' questions', true);
+        setMsg('Ready — Save as PDF from the print dialog (Choose "Save as PDF") · ' +
+               draft.mtId + ' · ' + draft.totalQuestions + ' questions', true);
         summaryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         window.dispatchEvent(new CustomEvent('pk:papercreated', { detail: draft }));
       }catch(err){
@@ -533,17 +526,17 @@
         return;
       }
       openPdfBtn.disabled = true;
+      const label = openPdfBtn.textContent;
+      openPdfBtn.textContent = 'Opening…';
       try{
-        const blob = lastPdfBlob || await generatePDF(data);
-        lastPdfBlob = blob;
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+        await generatePDF(data);
+        setMsg('Print dialog opened — choose "Save as PDF".', true);
       }catch(err){
         console.error(err);
         setMsg('Could not open PDF: ' + (err && err.message ? err.message : err));
       }finally{
         openPdfBtn.disabled = false;
+        openPdfBtn.textContent = label;
       }
     });
 
