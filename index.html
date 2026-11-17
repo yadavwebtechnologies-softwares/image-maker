@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#ffffff">
 <title>PrepareKora Studio — MCQ Paper Builder &amp; Thumbnail Maker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +22,6 @@
   </div>
 </header>
 
-<!-- ================= MCQ PAPER BUILDER ================= -->
 <section id="tool-paper" class="tool-section active">
   <div class="paper-wrap">
 
@@ -48,46 +47,21 @@
         </label>
 
         <label id="paper-custom-wrap" hidden>Custom Subject
-          <input id="paper-custom-subject" type="text" placeholder="e.g. Assam GK">
+          <input id="paper-custom-subject" type="text">
         </label>
 
         <label class="full">Test Title <span class="opt">(optional — auto if blank)</span>
-          <input id="paper-title" type="text" placeholder="Auto: &lt;Subject&gt; — MCQ Practice Paper">
+          <input id="paper-title" type="text">
         </label>
       </div>
 
       <label for="paper-input" class="paste-label">Paste MCQs</label>
-      <textarea id="paper-input" spellcheck="false" placeholder="Q: Who was the first Chief Minister of Assam? (অসমৰ প্ৰথম মুখ্যমন্ত্ৰী কোন আছিল?)
-A) Gopinath Bordoloi
-B) Bishnuram Medhi
-C) Bimala Prasad Chaliha
-D) Sarat Chandra Singha
-Ans: A
-
-Q: ..."></textarea>
+      <textarea id="paper-input" spellcheck="false"></textarea>
 
       <div class="actions">
         <button id="paper-create" type="button">Create</button>
         <span class="msg" id="paper-msg"></span>
       </div>
-
-      <details class="rules">
-        <summary>Input format — how to paste</summary>
-        <pre>Each question starts with Q: and has four options A) B) C) D).
-Separate questions with a blank line (or just start the next Q:).
-
-Optional per question:  Ans: A   → adds an answer key page.
-Optional header line:   Title: My Test Paper
-Bilingual: put Assamese in ( ) or after | on any line.
-
-Example:
-Q: Who was the first CM of Assam? (অসমৰ প্ৰথম মুখ্যমন্ত্ৰী কোন?)
-A) Gopinath Bordoloi
-B) Bishnuram Medhi
-C) Bimala Prasad Chaliha
-D) Sarat Chandra Singha
-Ans: A</pre>
-      </details>
     </div>
 
     <div id="paper-summary" class="paper-summary panel-inner" hidden>
@@ -107,7 +81,6 @@ Ans: A</pre>
   </div>
 </section>
 
-<!-- ================= THUMBNAIL MAKER ================= -->
 <section id="tool-thumb" class="tool-section">
   <div class="toolbar">
     <h2>Thumbnail Maker</h2>
@@ -122,19 +95,19 @@ Ans: A</pre>
     <details class="input-panel" open>
       <summary>Content Input — Auto-saves · Live preview</summary>
       <div class="input-grid">
-        <label>MT ID<input id="in-mtId" type="text" placeholder="MT/GK/0001"></label>
-        <label>Subject<input id="in-subject" type="text" placeholder="GENERAL KNOWLEDGE"></label>
-        <label class="full">Title<textarea id="in-title" placeholder="Important&#10;MCQs"></textarea><span class="hint">Use Enter for line break</span></label>
-        <label>Exam Type<input id="in-examType" type="text" placeholder="MOCK EXAMINATION"></label>
-        <label>Questions<input id="in-questions" type="text" placeholder="120"></label>
-        <label class="full">Exam Name<textarea id="in-examName" placeholder="ADRE&#10;General&#10;Knowledge"></textarea><span class="hint">Use Enter for line break</span></label>
-        <label class="full">Question<textarea id="in-question" placeholder="Who is the Education Minister of Assam?"></textarea></label>
+        <label>MT ID<input id="in-mtId" type="text"></label>
+        <label>Subject<input id="in-subject" type="text"></label>
+        <label class="full">Title<textarea id="in-title"></textarea><span class="hint">Use Enter for line break</span></label>
+        <label>Exam Type<input id="in-examType" type="text"></label>
+        <label>Questions<input id="in-questions" type="text"></label>
+        <label class="full">Exam Name<textarea id="in-examName"></textarea><span class="hint">Use Enter for line break</span></label>
+        <label class="full">Question<textarea id="in-question"></textarea></label>
         <label>Option A<input id="in-optA" type="text"></label>
         <label>Option B<input id="in-optB" type="text"></label>
         <label>Option C<input id="in-optC" type="text"></label>
         <label>Option D<input id="in-optD" type="text"></label>
-        <label>Time<input id="in-time" type="text" placeholder="30 Min"></label>
-        <label>QR URL<input id="in-url" type="text" placeholder="https://..."></label>
+        <label>Time<input id="in-time" type="text"></label>
+        <label>QR URL<input id="in-url" type="text"></label>
       </div>
     </details>
     <div class="preview-area">
