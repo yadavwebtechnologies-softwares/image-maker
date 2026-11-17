@@ -1,54 +1,39 @@
 /* ================================================================
-   mcq.js — PrepareKora MCQ Paper Builder
-   Responsibilities:
-     • parse pasted MCQs into { qEn, qAs, options[4], answer }
-     • validate every question before generation
-     • build the A4 PDF with jsPDF (vector text)
-     • wire the Paper Builder UI to PKState (single source of truth)
+   mcq.js — PrepareKora MCQ Paper Builder (browser-print PDF)
+   Renders the exact bilingual A4 template — 5 questions per page,
+   English (left) + Assamese (right), inline answer, header with
+   MT ID + QR, footer with brand + page numbers.
    ================================================================ */
 (function initMCQ(global){
   'use strict';
 
-  /* ==========================================================
-     PARSER
-     ========================================================== */
+  /* ---------------- helpers ---------------- */
+  function escHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
 
+  /* ---------------- parser (unchanged) ---------------- */
   function splitBi(raw){
     let en = String(raw == null ? '' : raw).trim();
     let as = '';
     if(en.indexOf('|') !== -1){
-      const i = en.indexOf('|');
-      en = en.slice(0, i).trim();
-      as = en.length >= 0 ? String(raw).slice(i + 1).trim() : '';
-      // safer re-slice from original to avoid index drift
       as = String(raw).slice(String(raw).indexOf('|') + 1).trim();
+      en = String(raw).slice(0, String(raw).indexOf('|')).trim();
     } else {
       const m = en.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
       if(m){ en = m[1].trim(); as = m[2].trim(); }
     }
-    return { en: en, as: as };
+    return { en, as };
   }
 
   function emptyOptions(){
     return [
-      { en: '', as: '' },
-      { en: '', as: '' },
-      { en: '', as: '' },
-      { en: '', as: '' }
+      { en:'', as:'' }, { en:'', as:'' }, { en:'', as:'' }, { en:'', as:'' }
     ];
   }
 
-  /**
-   * parseMCQs(text) → { title: string, questions: Question[] }
-   * Each Question: { qEn, qAs, options:[4], answer:'A'..'D'|null }
-   * Rules:
-   *  - `Title:` line anywhere sets the title (first wins)
-   *  - `Q:` / `Question:` starts a new question (flushes previous)
-   *  - `Q(as):` sets Assamese-only line on current question
-   *  - `A)` … `D)` set options on current question
-   *  - `Ans:` / `Answer:` / `Correct:` sets answer letter
-   *  - bilingual via `( )` or `|` on any of the above
-   */
   function parseMCQs(text){
     const lines = String(text || '').split(/\r?\n/);
     const questions = [];
@@ -57,10 +42,8 @@
 
     function flush(){
       if(!cur) return;
-      const filled = cur.options.filter(function(o){ return o && o.en; }).length;
-      if(cur.qEn && filled >= 2){
-        questions.push(cur);
-      }
+      const filled = cur.options.filter(o => o && o.en).length;
+      if(cur.qEn && filled >= 2) questions.push(cur);
       cur = null;
     }
 
@@ -69,38 +52,24 @@
       if(!line) continue;
       let m;
 
-      // Title line
       if((m = line.match(/^title\s*[:\-|]\s*(.+)$/i))){
-        if(!title){
-          const b = splitBi(m[1]);
-          title = b.en;
-        }
+        if(!title){ const b = splitBi(m[1]); title = b.en; }
         continue;
       }
-
-      // Q(as):
       if((m = line.match(/^q\s*\(\s*as\s*\)\s*[:\-|]\s*(.+)$/i))){
-        if(cur){
-          cur.qAs = String(m[1]).trim();
-        }
+        if(cur) cur.qAs = String(m[1]).trim();
         continue;
       }
-
-      // Q: / Question:
       if((m = line.match(/^(?:q|question)\s*[:\-|]\s*(.+)$/i))){
         flush();
         const b = splitBi(m[1]);
         cur = { qEn: b.en, qAs: b.as, options: emptyOptions(), answer: null };
         continue;
       }
-
-      // Ans: / Answer: / Correct:
       if((m = line.match(/^(?:ans|answer|correct)\s*[:\-|]?\s*([A-Da-d])\b/i))){
         if(cur) cur.answer = m[1].toUpperCase();
         continue;
       }
-
-      // Options A) B) C) D)
       if((m = line.match(/^([A-Da-d])\s*[\)\.\:]\s*(.+)$/))){
         if(!cur) continue;
         const idx = 'ABCD'.indexOf(m[1].toUpperCase());
@@ -110,378 +79,298 @@
         }
         continue;
       }
-
-      // Other lines: ignore (safe — could be stray separator or note)
     }
-
     flush();
-    return { title: title, questions: questions };
+    return { title, questions };
   }
 
-  /* ==========================================================
-     BENGALI FONT (lazy, best-effort)
-     ========================================================== */
-
-  let bengaliFontPromise = null;
-
-  function arrayBufferToBase64(buf){
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    const CHUNK = 0x8000;
-    for(let i = 0; i < bytes.length; i += CHUNK){
-      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
-    }
-    return btoa(bin);
-  }
-
-  function loadBengaliFontBase64(){
-    if(bengaliFontPromise) return bengaliFontPromise;
-    bengaliFontPromise = (async function(){
-      const url = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansBengali/NotoSansBengali-Regular.ttf';
-      try{
-        const res = await fetch(url);
-        if(!res.ok) return null;
-        const buf = await res.arrayBuffer();
-        return arrayBufferToBase64(buf);
-      }catch(e){
-        return null;
-      }
-    })();
-    return bengaliFontPromise;
-  }
-
-  async function tryRegisterBengali(doc){
-    const b64 = await loadBengaliFontBase64();
-    if(!b64) return false;
+  /* ---------------- QR URL source ----------------
+     Reads from the thumbnail's saved state (single source of truth).
+     Falls back to the default WhatsApp URL. */
+  function getQRUrl(){
     try{
-      doc.addFileToVFS('NotoSansBengali-Regular.ttf', b64);
-      doc.addFont('NotoSansBengali-Regular.ttf', 'NotoSansBengali', 'normal');
-      return true;
-    }catch(e){
-      return false;
-    }
+      const s = JSON.parse(localStorage.getItem('pk_banner_state') || 'null');
+      if(s && s.url) return s.url;
+    }catch(e){}
+    return 'https://chat.whatsapp.com/DLrcA98MrlYKOeZ5DMeN5Z';
   }
 
-  /* ==========================================================
-     PDF GENERATOR
-     ========================================================== */
+  /* ---------------- print template CSS (verbatim) ---------------- */
+  const PRINT_CSS = `
+* { box-sizing: border-box; }
+body { margin: 0; padding: 20px; background: #ededed; color: #111; font-family: Arial, sans-serif; }
+.sheet {
+  width: 210mm; height: 297mm; margin: 0 auto 20px; padding: 10mm 11mm 8mm;
+  background: #fff; display: flex; flex-direction: column;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.10); overflow: hidden;
+}
+.page-header {
+  flex: 0 0 14mm; display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content 10mm;
+  justify-content: space-between; align-items: center; gap: 3mm;
+  border-bottom: 0.3mm solid #777; padding-bottom: 3mm;
+  font-family: Arial, sans-serif; white-space: nowrap;
+}
+.header-brand { font-size: 8pt; font-weight: 700; color: #111; letter-spacing: -0.2px; }
+.header-brand .in { color: #999; }
+.header-subject, .header-id { font-size: 8pt; font-weight: 600; color: #444; }
+.header-subject {
+  padding-left: 4mm; border-left: 0.2mm solid #d5d5d5; text-align: center;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.header-id { padding-left: 4mm; border-left: 0.2mm solid #d5d5d5; }
+.header-qr { width: 10mm; height: 10mm; display: block; object-fit: contain; flex-shrink: 0; }
+.question-grid {
+  flex: 1; min-height: 0; display: grid;
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+}
+.question-pair {
+  min-height: 0; display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-bottom: 0.25mm solid #d0d0d0;
+  break-inside: avoid; page-break-inside: avoid;
+}
+.question-pair:last-child { border-bottom: none; }
+.language-card {
+  min-width: 0; min-height: 0; padding: 4mm 4mm;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.english { border-right: 0.3mm solid #bcbcbc; font-family: "Times New Roman", Times, serif; }
+.assamese { font-family: "Noto Sans Bengali", "Nirmala UI", sans-serif; }
+.question { font-size: 11pt; font-weight: 700; line-height: 1.35; margin: 0 0 3mm; color: #111; }
+.assamese .question { font-size: 10.5pt; }
+.question-number { font-weight: 700; white-space: nowrap; }
+.options {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 3mm; row-gap: 2.2mm; font-size: 9.5pt; line-height: 1.3;
+}
+.option { min-width: 0; display: flex; align-items: flex-start; gap: 1.5mm; }
+.option-label { flex-shrink: 0; font-weight: 700; }
+.answer {
+  margin-top: auto; padding-top: 2.5mm; border-top: 0.2mm solid #e1e1e1;
+  font-size: 9pt; font-weight: 700; line-height: 1.3;
+}
+.page-footer {
+  flex: 0 0 8mm; display: grid; grid-template-columns: 1fr 1fr 1fr;
+  align-items: end; border-top: 0.25mm solid #bdbdbd; padding-top: 2mm;
+  font-family: Arial, sans-serif; font-size: 7pt; font-weight: 600;
+  color: #666; letter-spacing: 0.25px;
+}
+.footer-brand { color: #222; text-align: left; }
+.footer-subject { text-align: center; }
+.footer-page { text-align: right; }
+@page { size: A4 portrait; margin: 0; }
+@media print {
+  html, body { width: 210mm; margin: 0; padding: 0; background: #fff; }
+  .sheet {
+    width: 210mm; height: 297mm; margin: 0; padding: 10mm 11mm 8mm;
+    box-shadow: none; overflow: hidden;
+    page-break-after: always; break-after: page;
+  }
+  .sheet:last-child { page-break-after: auto; break-after: auto; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+`;
 
-  async function generatePDF(testData){
-    const jsPDFCtor = (global.jspdf && global.jspdf.jsPDF) || global.jsPDF;
-    if(typeof jsPDFCtor !== 'function'){
-      throw new Error('PDF library not loaded. Check your internet connection and refresh.');
-    }
+  /* ---------------- print template JS (adapted) ---------------- */
+  const PRINT_JS = `
+function element(tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+function assameseNumber(number) {
+  const digits = "০১২৩৪৫৬৭৮৯";
+  return String(number).replace(/[0-9]/g, d => digits[Number(d)]);
+}
+function createHeader() {
+  const header = element("header", "page-header");
+  const brand = element("span", "header-brand");
+  brand.appendChild(document.createTextNode(PK_DATA.brand));
+  brand.appendChild(element("span", "in", ".in"));
+  header.append(
+    brand,
+    element("span", "header-subject", PK_DATA.subject),
+    element("span", "header-id", "MT ID: " + PK_DATA.mtId)
+  );
+  const qr = element("img", "header-qr");
+  qr.alt = "QR Code";
+  const u = new URL("https://api.qrserver.com/v1/create-qr-code/");
+  u.searchParams.set("size", "240x240");
+  u.searchParams.set("margin", "0");
+  u.searchParams.set("data", PK_DATA.qrUrl);
+  qr.src = u.href;
+  header.appendChild(qr);
+  return header;
+}
+function createFooter(page, total) {
+  const footer = element("footer", "page-footer");
+  footer.append(
+    element("span", "footer-brand", "PREPAREKORA.IN"),
+    element("span", "footer-subject", PK_DATA.footerSubject),
+    element("span", "footer-page",
+      String(page).padStart(2, "0") + " / " + String(total).padStart(2, "0"))
+  );
+  return footer;
+}
+function createCard(number, language, qData) {
+  const isEnglish = language === "en";
+  const card = element("div", "language-card " + (isEnglish ? "english" : "assamese"));
+  const heading = element("div", "question");
+  const numberText = isEnglish
+    ? "Q" + number + "."
+    : "প্ৰশ্ন " + assameseNumber(number) + ".";
+  heading.append(
+    element("span", "question-number", numberText),
+    document.createTextNode(" " + (isEnglish ? qData.en : qData.as))
+  );
+  card.appendChild(heading);
+  const options = element("div", "options");
+  qData.options.forEach((option, index) => {
+    const letter = ["A", "B", "C", "D"][index];
+    const item = element("div", "option");
+    item.append(
+      element("b", "option-label", letter + "."),
+      element("span", "", isEnglish ? (option[0] || '') : (option[1] || ''))
+    );
+    options.appendChild(item);
+  });
+  card.appendChild(options);
+  if (qData.answer) {
+    const idx = ["A", "B", "C", "D"].indexOf(qData.answer);
+    const ansOpt = qData.options[idx] || ['', ''];
+    const ansText = isEnglish
+      ? "Correct: " + qData.answer + ". " + (ansOpt[0] || '')
+      : "শুদ্ধ উত্তৰ: " + qData.answer + ". " + (ansOpt[1] || '');
+    card.appendChild(element("div", "answer", ansText));
+  }
+  return card;
+}
+function createQuestionPair(qData, number) {
+  const pair = element("div", "question-pair");
+  pair.append(
+    createCard(number, "en", qData),
+    createCard(number, "as", qData)
+  );
+  return pair;
+}
+function createPage(pageQuestions, startIndex, pageNum, totalPages) {
+  const sheet = element("section", "sheet");
+  sheet.appendChild(createHeader());
+  const grid = element("main", "question-grid");
+  pageQuestions.forEach((q, i) => {
+    grid.appendChild(createQuestionPair(q, startIndex + i + 1));
+  });
+  sheet.appendChild(grid);
+  sheet.appendChild(createFooter(pageNum, totalPages));
+  return sheet;
+}
+function renderPaper() {
+  const output = document.getElementById("paper");
+  if (!output) return;
+  const perPage = 5;
+  const totalPages = Math.ceil(PK_DATA.questions.length / perPage);
+  for (let page = 0; page < totalPages; page++) {
+    const start = page * perPage;
+    const pageQuestions = PK_DATA.questions.slice(start, start + perPage);
+    output.appendChild(createPage(pageQuestions, start, page + 1, totalPages));
+  }
+}
+renderPaper();
+`;
 
-    const doc = new jsPDFCtor({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+  /* ---------------- build full HTML for the print window ---------------- */
+  function buildPrintHTML(testData){
+    const questions = testData.questions.map(q => ({
+      en: q.qEn || '',
+      as: q.qAs || '',
+      options: (q.options || []).map(o => [ (o && o.en) || '', (o && o.as) || '' ]),
+      answer: q.answer || null
+    }));
 
-    doc.setProperties({
-      title: testData.title || 'MCQ Paper',
-      subject: testData.subject || '',
-      author: 'PrepareKora.in',
-      creator: 'PrepareKora Studio'
-    });
+    const subject = testData.subject || 'General Knowledge';
+    const data = {
+      brand: 'Preparekora',
+      subject: subject,
+      footerSubject: subject.toUpperCase(),
+      mtId: testData.mtId || '',
+      qrUrl: getQRUrl(),
+      questions: questions
+    };
 
-    const hasBengali = testData.questions.some(function(q){
-      return q.qAs || q.options.some(function(o){ return o && o.as; });
-    });
-    const bengaliReady = hasBengali ? await tryRegisterBengali(doc) : false;
+    // JSON is safe inside <script> after escaping </script
+    const jsonStr = JSON.stringify(data).replace(/<\/script/gi, '<\\/script');
 
-    const PW = doc.internal.pageSize.getWidth();
-    const PH = doc.internal.pageSize.getHeight();
-    const ML = 46, MR = 46, MT = 46, MB = 54;
-    const CW = PW - ML - MR;
-
-    const INK   = [17, 24, 39];
-    const MUTED = [75, 85, 99];
-    const LINE  = [215, 219, 224];
-    const SOFT  = [245, 247, 250];
-    const GREEN = [22, 163, 74];
-
-    let y = MT;
-
-    function drawHeader(){
-      y = MT;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.setTextColor(INK[0], INK[1], INK[2]);
-      doc.text('PrepareKora', ML, y);
-      const w1 = doc.getTextWidth('PrepareKora');
-      doc.setTextColor(136, 136, 136);
-      doc.text('.in', ML + w1, y);
-
-      doc.setFont('courier', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-      doc.text(testData.mtId || '', PW - MR, y, { align: 'right' });
-
-      y += 12;
-      doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-      doc.setLineWidth(0.7);
-      doc.line(ML, y, PW - MR, y);
-      y += 18;
-    }
-
-    function drawFooter(pageNum, totalPages){
-      doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-      doc.setLineWidth(0.5);
-      doc.line(ML, PH - MB + 14, PW - MR, PH - MB + 14);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-      doc.text('PrepareKora.in  ·  Learn · Practice · Succeed', ML, PH - MB + 28);
-      doc.text('Page ' + pageNum + ' / ' + totalPages, PW - MR, PH - MB + 28, { align: 'right' });
-    }
-
-    function newPage(){
-      doc.addPage();
-      drawHeader();
-    }
-
-    function ensureSpace(need){
-      if(y + need > PH - MB - 10) newPage();
-    }
-
-    function drawTitleBlock(){
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.setTextColor(INK[0], INK[1], INK[2]);
-      const tLines = doc.splitTextToSize(testData.title || '', CW);
-      doc.text(tLines, ML, y);
-      y += tLines.length * 22 + 4;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-      const info = 'Subject: ' + testData.subject +
-                   '    ·    Total Questions: ' + testData.totalQuestions;
-      doc.text(info, ML, y);
-      y += 14;
-
-      const boxY = y;
-      const boxH = 42;
-      doc.setFillColor(SOFT[0], SOFT[1], SOFT[2]);
-      doc.roundedRect(ML, boxY, CW, boxH, 6, 6, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-      doc.text('Instructions', ML + 12, boxY + 15);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Read each question carefully. Each question has four options (A, B, C, D). Choose the correct one.', ML + 12, boxY + 28);
-      y = boxY + boxH + 16;
-    }
-
-    function drawQuestion(q, index){
-      const num = index + 1;
-      const lineH = 13;
-      const OPT_LINE_H = 11;
-      const OPT_SUB_H = 10;
-
-      // Question EN lines
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
-      const qLines = doc.splitTextToSize(q.qEn || '', CW - 24);
-
-      // Question AS lines (using intended font for correct measurement)
-      let qAsLines = [];
-      if(q.qAs){
-        if(bengaliReady) doc.setFont('NotoSansBengali', 'normal');
-        else doc.setFont('helvetica', 'italic');
-        doc.setFontSize(10);
-        qAsLines = doc.splitTextToSize('(' + q.qAs + ')', CW - 24);
-      }
-
-      // Options — measure each cell
-      const optGap = 14;
-      const optColW = (CW - 24 - optGap) / 2;
-      const optData = q.options.map(function(o, i){
-        const letter = 'ABCD'[i];
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        const combined = letter + ') ' + (o.en || '');
-        const lines = doc.splitTextToSize(combined, optColW - 8);
-        let subLines = [];
-        if(o.as){
-          if(bengaliReady) doc.setFont('NotoSansBengali', 'normal');
-          else doc.setFont('helvetica', 'italic');
-          doc.setFontSize(9.5);
-          subLines = doc.splitTextToSize(o.as, optColW - 8);
-        }
-        const h = lines.length * OPT_LINE_H + subLines.length * OPT_SUB_H + 8;
-        return { lines: lines, subLines: subLines, h: h, col: i % 2, row: Math.floor(i / 2) };
-      });
-
-      const row1H = Math.max(optData[0].h, optData[1].h);
-      const row2H = Math.max(optData[2].h, optData[3].h);
-      const optBlockH = row1H + row2H + 4;
-
-      const headH = qLines.length * lineH + qAsLines.length * lineH + 4;
-      const totalH = headH + optBlockH + 10;
-
-      ensureSpace(totalH);
-
-      // Number
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
-      doc.setTextColor(INK[0], INK[1], INK[2]);
-      doc.text(num + '.', ML, y + 10);
-
-      // Question EN
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10.5);
-      doc.setTextColor(INK[0], INK[1], INK[2]);
-      doc.text(qLines, ML + 22, y + 10);
-      let curY = y + 10 + qLines.length * lineH;
-
-      // Question AS
-      if(qAsLines.length){
-        if(bengaliReady) doc.setFont('NotoSansBengali', 'normal');
-        else doc.setFont('helvetica', 'italic');
-        doc.setFontSize(10);
-        doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-        doc.text(qAsLines, ML + 22, curY + 1);
-        curY += qAsLines.length * lineH + 1;
-      }
-
-      // Options
-      const optStartY = curY + 4;
-      optData.forEach(function(o){
-        const colX = ML + 22 + o.col * (optColW + optGap);
-        const optY = optStartY + o.row * (row1H + 3);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-        doc.text(o.lines, colX, optY + 10);
-
-        if(o.subLines.length){
-          if(bengaliReady) doc.setFont('NotoSansBengali', 'normal');
-          else doc.setFont('helvetica', 'italic');
-          doc.setFontSize(9.5);
-          const subY = optY + 10 + o.lines.length * OPT_LINE_H;
-          doc.text(o.subLines, colX, subY);
-        }
-      });
-
-      y = optStartY + row1H + row2H + 10;
-    }
-
-    function drawAnswerKey(){
-      const anyAnswer = testData.questions.some(function(q){ return !!q.answer; });
-      if(!anyAnswer) return;
-
-      newPage();
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor(INK[0], INK[1], INK[2]);
-      doc.text('Answer Key', ML, y);
-      y += 10;
-      doc.setDrawColor(GREEN[0], GREEN[1], GREEN[2]);
-      doc.setLineWidth(1.5);
-      doc.line(ML, y, ML + 62, y);
-      y += 22;
-
-      const cols = 5;
-      const cellW = CW / cols;
-      const cellH = 26;
-      let rowStartY = y;
-
-      testData.questions.forEach(function(q, i){
-        const col = i % cols;
-        if(col === 0){
-          if(i > 0) rowStartY += cellH;
-          if(rowStartY + cellH > PH - MB - 10){
-            newPage();
-            rowStartY = y;
-          }
-        }
-        const cx = ML + col * cellW;
-        const cy = rowStartY;
-
-        doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-        doc.setLineWidth(0.5);
-        doc.rect(cx, cy, cellW, cellH);
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(INK[0], INK[1], INK[2]);
-        doc.text((i + 1) + '.', cx + 8, cy + cellH / 2 + 3);
-
-        doc.setFontSize(11);
-        doc.setTextColor(GREEN[0], GREEN[1], GREEN[2]);
-        doc.text(q.answer || '—', cx + cellW - 8, cy + cellH / 2 + 3, { align: 'right' });
-      });
-    }
-
-    drawHeader();
-    drawTitleBlock();
-    testData.questions.forEach(function(q, i){
-      if(q && q.qEn) drawQuestion(q, i);
-    });
-    drawAnswerKey();
-
-    const total = doc.getNumberOfPages();
-    for(let p = 1; p <= total; p++){
-      doc.setPage(p);
-      drawFooter(p, total);
-    }
-
-    return doc.output('blob');
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escHtml(data.subject)} | ${escHtml(data.mtId)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>${PRINT_CSS}</style>
+</head>
+<body>
+<div id="paper"></div>
+<script>
+const PK_DATA = ${jsonStr};
+${PRINT_JS}
+</script>
+<script>
+function pkAutoPrint(){
+  const ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+  ready.then(function(){
+    setTimeout(function(){
+      try { window.focus(); window.print(); } catch(e){}
+    }, 800);
+  });
+}
+if (document.readyState === 'complete') pkAutoPrint();
+else window.addEventListener('load', pkAutoPrint);
+</script>
+</body>
+</html>`;
   }
 
-  /* ==========================================================
-     FILE HELPERS
-     ========================================================== */
-
-  function slugify(s){
-    return String(s == null ? '' : s)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40) || 'paper';
+  /* ---------------- open print preview window ---------------- */
+  function openPrintPreview(testData){
+    const w = window.open('', '_blank');
+    if(!w) throw new Error('Popup blocked. Please allow popups for this site.');
+    try{
+      const html = buildPrintHTML(testData);
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch(e){
+      try{ w.close(); }catch(x){}
+      throw e;
+    }
+    return w;
   }
 
-  function filenameFor(testData){
-    const id = String(testData.mtId || 'MT').replace(/[^a-z0-9]+/gi, '-');
-    return 'PrepareKora_' + id + '_' + slugify(testData.title) + '.pdf';
-  }
-
-  function downloadBlob(blob, filename){
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
-  }
-
-  /* ==========================================================
-     UI WIRING
-     ========================================================== */
-
+  /* ---------------- UI wiring ---------------- */
   function wire(){
-    const subjectSel    = document.getElementById('paper-subject');
-    const customWrap    = document.getElementById('paper-custom-wrap');
-    const customInput   = document.getElementById('paper-custom-subject');
-    const titleInput    = document.getElementById('paper-title');
-    const inputEl       = document.getElementById('paper-input');
-    const createBtn     = document.getElementById('paper-create');
-    const msgEl         = document.getElementById('paper-msg');
-    const summaryEl     = document.getElementById('paper-summary');
-    const openPdfBtn    = document.getElementById('paper-open-pdf');
-    const thumbBtn      = document.getElementById('paper-thumb-btn');
+    const subjectSel  = document.getElementById('paper-subject');
+    const customWrap  = document.getElementById('paper-custom-wrap');
+    const customInput = document.getElementById('paper-custom-subject');
+    const titleInput  = document.getElementById('paper-title');
+    const inputEl     = document.getElementById('paper-input');
+    const createBtn   = document.getElementById('paper-create');
+    const msgEl       = document.getElementById('paper-msg');
+    const summaryEl   = document.getElementById('paper-summary');
+    const openPdfBtn  = document.getElementById('paper-open-pdf');
+    const thumbBtn    = document.getElementById('paper-thumb-btn');
 
     const sumMtId    = document.getElementById('sum-mtid');
     const sumSubject = document.getElementById('sum-subject');
     const sumTitle   = document.getElementById('sum-title');
     const sumCount   = document.getElementById('sum-count');
 
-    if(!createBtn) return; // safety
+    if(!createBtn) return;
 
-    let lastPdfBlob = null;
-
-    // Custom subject reveal
     subjectSel.addEventListener('change', function(){
       customWrap.hidden = subjectSel.value !== 'Custom';
       if(!customWrap.hidden) customInput.focus();
@@ -501,13 +390,14 @@
       summaryEl.hidden = false;
     }
 
-    // Restore summary from a saved session
+    // restore summary from a saved session
     const saved = PKState.get();
     if(saved && saved.questions && saved.questions.length){
       renderSummary(saved);
     }
 
-    createBtn.addEventListener('click', async function(){
+    /* ---------- CREATE button ---------- */
+    createBtn.addEventListener('click', function(){
       setMsg('');
 
       let subject = subjectSel.value;
@@ -525,7 +415,7 @@
 
       for(let i = 0; i < parsed.questions.length; i++){
         const q = parsed.questions[i];
-        const filled = q.options.filter(function(o){ return o && o.en; }).length;
+        const filled = q.options.filter(o => o && o.en).length;
         if(filled < 2){
           setMsg('Question ' + (i + 1) + ' needs at least 2 options.');
           return;
@@ -537,9 +427,7 @@
       createBtn.textContent = 'Creating…';
 
       try{
-        // Peek ID (do not consume yet — PDF may fail)
         const peekedId = PKState.peekMTId(subject);
-
         const draft = PKState.buildTestData({
           mtId: peekedId,
           subject: subject,
@@ -547,61 +435,69 @@
           questions: parsed.questions
         });
 
-        const blob = await generatePDF(draft);
+        // Open window synchronously from user gesture
+        const w = window.open('', '_blank');
+        if(!w){
+          setMsg('Popup blocked. Please allow popups for this site and try again.');
+          createBtn.disabled = false;
+          createBtn.textContent = label;
+          return;
+        }
 
-        // Success — now officially consume the ID
+        // Write first pass with peeked ID
+        const html = buildPrintHTML(draft);
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+
+        // Consume ID (should match peeked unless race)
         const consumedId = PKState.consumeMTId(subject);
-        draft.mtId = consumedId;
+        if(consumedId !== peekedId){
+          draft.mtId = consumedId;
+          const finalHtml = buildPrintHTML(draft);
+          w.document.open();
+          w.document.write(finalHtml);
+          w.document.close();
+        }
 
         PKState.save(draft);
-        lastPdfBlob = blob;
-
         renderSummary(draft);
-        downloadBlob(blob, filenameFor(draft));
-
-        setMsg('PDF created · ' + draft.mtId + ' · ' + draft.totalQuestions + ' questions', true);
         summaryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+        setMsg('Print dialog opening · ' + draft.mtId + ' · ' + draft.totalQuestions + ' questions', true);
         window.dispatchEvent(new CustomEvent('pk:papercreated', { detail: draft }));
-      }catch(err){
-        console.error(err);
-        setMsg('PDF generation failed: ' + (err && err.message ? err.message : err));
-      }finally{
+
         createBtn.disabled = false;
         createBtn.textContent = label;
+      } catch(err){
+        console.error(err);
+        setMsg('Failed: ' + (err && err.message ? err.message : err));
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create';
       }
     });
 
-    // Open PDF — regenerate from saved state if we don't have a blob (e.g. after reload)
-    openPdfBtn.addEventListener('click', async function(){
+    /* ---------- OPEN PDF (reopens print preview from saved data) ---------- */
+    openPdfBtn.addEventListener('click', function(){
       setMsg('');
       const data = PKState.get();
       if(!data || !data.questions || !data.questions.length){
         setMsg('No test data available. Click Create first.');
         return;
       }
-
-      openPdfBtn.disabled = true;
       try{
-        const blob = lastPdfBlob || await generatePDF(data);
-        lastPdfBlob = blob;
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
-      }catch(err){
+        openPrintPreview(data);
+      } catch(err){
         console.error(err);
-        setMsg('Could not open PDF: ' + (err && err.message ? err.message : err));
-      }finally{
-        openPdfBtn.disabled = false;
+        setMsg('Could not open print preview: ' + (err && err.message ? err.message : err));
       }
     });
 
-    // Create Thumbnail — switch tab; thumbnail.js listens for pk:papercreated / pk:testdatachanged
+    /* ---------- CREATE THUMBNAIL ---------- */
     thumbBtn.addEventListener('click', function(){
       if(global.PKApp && typeof global.PKApp.switchTool === 'function'){
         global.PKApp.switchTool('thumb');
       } else {
-        // Fallback: click the tab button directly
         const tab = document.querySelector('.tool-tabs button[data-tool="thumb"]');
         if(tab) tab.click();
       }
@@ -614,14 +510,12 @@
     wire();
   }
 
-  /* ==========================================================
-     EXPORT
-     ========================================================== */
-
+  /* ---------------- export ---------------- */
   global.PKMCQ = {
     splitBi: splitBi,
     parseMCQs: parseMCQs,
-    generatePDF: generatePDF
+    buildPrintHTML: buildPrintHTML,
+    openPrintPreview: openPrintPreview
   };
 
 })(window);
