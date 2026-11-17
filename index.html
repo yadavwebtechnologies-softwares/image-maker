@@ -1,551 +1,177 @@
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>PrepareKora Studio</title>
-
-    <meta
-        name="description"
-        content="PrepareKora Studio - Bilingual MCQ PDF and Thumbnail Maker"
-    >
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap"
-        rel="stylesheet"
-    >
-
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="thumbnail-maker.css">
-
-    <!-- PDF and image generation libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-    <!-- Application scripts -->
-    <script src="mcq-parser.js" defer></script>
-    <script src="pdf-generator.js" defer></script>
-    <script src="thumbnail-maker.js" defer></script>
-    <script src="thumbnail-integration.js" defer></script>
-    <script src="script.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepareKora Studio — MCQ Paper Builder &amp; Thumbnail Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
 
-    <!-- ================= APP HEADER ================= -->
+<header class="app-header">
+  <h1>PrepareKora Studio<span>.in</span></h1>
+  <div class="tool-tabs">
+    <button class="tab active" data-tool="paper" type="button">MCQ Paper Builder</button>
+    <button class="tab" data-tool="thumb" type="button">Thumbnail Maker</button>
+  </div>
+</header>
 
-    <header class="app-header">
+<!-- ================= MCQ PAPER BUILDER ================= -->
+<section id="tool-paper" class="tool-section active">
+  <div class="paper-wrap">
 
-        <div class="header-brand">
-            <a href="index.html" aria-label="PrepareKora Studio Home">
-                Preparekora<span>.in</span>
-                <small>STUDIO</small>
-            </a>
+    <div class="paper-form panel-inner">
+      <div class="header-row">
+        <label style="margin:0">MCQ Paper Builder</label>
+        <span class="ratio">A4 PDF · Official MT ID</span>
+      </div>
+
+      <div class="form-grid">
+        <label>Subject
+          <select id="paper-subject">
+            <option value="">— Select subject —</option>
+            <option value="Mathematics">Mathematics</option>
+            <option value="Reasoning">Reasoning</option>
+            <option value="General Knowledge">General Knowledge (GK)</option>
+            <option value="History">History</option>
+            <option value="Geography">Geography</option>
+            <option value="Current Affairs">Current Affairs</option>
+            <option value="Computer">Computer</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </label>
+
+        <label id="paper-custom-wrap" hidden>Custom Subject
+          <input id="paper-custom-subject" type="text" placeholder="e.g. Assam GK">
+        </label>
+
+        <label class="full">Test Title <span class="opt">(optional — auto if blank)</span>
+          <input id="paper-title" type="text" placeholder="Auto: &lt;Subject&gt; — MCQ Practice Paper">
+        </label>
+      </div>
+
+      <label for="paper-input" class="paste-label">Paste MCQs</label>
+      <textarea id="paper-input" spellcheck="false" placeholder="Q: Who was the first Chief Minister of Assam? (অসমৰ প্ৰথম মুখ্যমন্ত্ৰী কোন আছিল?)
+A) Gopinath Bordoloi
+B) Bishnuram Medhi
+C) Bimala Prasad Chaliha
+D) Sarat Chandra Singha
+Ans: A
+
+Q: ..."></textarea>
+
+      <div class="actions">
+        <button id="paper-create" type="button">Create</button>
+        <span class="msg" id="paper-msg"></span>
+      </div>
+
+      <details class="rules">
+        <summary>Input format — how to paste</summary>
+        <pre>Each question starts with Q: and has four options A) B) C) D).
+Separate questions with a blank line (or just start the next Q:).
+
+Optional per question:  Ans: A   → adds an answer key page.
+Optional header line:   Title: My Test Paper
+Bilingual: put Assamese in ( ) or after | on any line.
+
+Example:
+Q: Who was the first CM of Assam? (অসমৰ প্ৰথম মুখ্যমন্ত্ৰী কোন?)
+A) Gopinath Bordoloi
+B) Bishnuram Medhi
+C) Bimala Prasad Chaliha
+D) Sarat Chandra Singha
+Ans: A</pre>
+      </details>
+    </div>
+
+    <div id="paper-summary" class="paper-summary panel-inner" hidden>
+      <h3>Test ready</h3>
+      <dl class="summary-list">
+        <dt>MT ID</dt><dd id="sum-mtid">—</dd>
+        <dt>Subject</dt><dd id="sum-subject">—</dd>
+        <dt>Title</dt><dd id="sum-title">—</dd>
+        <dt>Questions</dt><dd id="sum-count">—</dd>
+      </dl>
+      <div class="actions">
+        <button id="paper-open-pdf" class="secondary" type="button">Open PDF</button>
+        <button id="paper-thumb-btn" type="button">Create Thumbnail →</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= THUMBNAIL MAKER (ported verbatim) ================= -->
+<section id="tool-thumb" class="tool-section">
+  <div class="toolbar">
+    <h2>Thumbnail Maker</h2>
+    <div class="controls">
+      <button id="portraitBtn" class="active" type="button" onclick="setFormat('portrait')">9:16 Portrait</button>
+      <button id="landscapeBtn" class="secondary" type="button" onclick="setFormat('landscape')">16:9 Landscape</button>
+      <button type="button" onclick="downloadBanner()">Download PNG</button>
+      <button class="secondary" type="button" onclick="resetDefaults()">Reset</button>
+    </div>
+  </div>
+  <div class="studio">
+    <details class="input-panel" open>
+      <summary>Content Input — Auto-saves · Live preview</summary>
+      <div class="input-grid">
+        <label>MT ID<input id="in-mtId" type="text" placeholder="MT/GK/0001"></label>
+        <label>Subject<input id="in-subject" type="text" placeholder="GENERAL KNOWLEDGE"></label>
+        <label class="full">Title<textarea id="in-title" placeholder="Important&#10;MCQs"></textarea><span class="hint">Use Enter for line break</span></label>
+        <label>Exam Type<input id="in-examType" type="text" placeholder="MOCK EXAMINATION"></label>
+        <label>Questions<input id="in-questions" type="text" placeholder="120"></label>
+        <label class="full">Exam Name<textarea id="in-examName" placeholder="ADRE&#10;General&#10;Knowledge"></textarea><span class="hint">Use Enter for line break</span></label>
+        <label class="full">Question<textarea id="in-question" placeholder="Who is the Education Minister of Assam?"></textarea></label>
+        <label>Option A<input id="in-optA" type="text"></label>
+        <label>Option B<input id="in-optB" type="text"></label>
+        <label>Option C<input id="in-optC" type="text"></label>
+        <label>Option D<input id="in-optD" type="text"></label>
+        <label>Time<input id="in-time" type="text" placeholder="30 Min"></label>
+        <label>QR URL<input id="in-url" type="text" placeholder="https://..."></label>
+      </div>
+    </details>
+    <div class="preview-area">
+      <div class="banner portrait" id="banner">
+        <div class="banner-inner">
+          <div class="brand-row">
+            <div class="brand">PrepareKora<span>.in</span></div>
+            <div class="test-id" data-bind="mtId">MT ID: MT/GK/0001</div>
+          </div>
+          <div class="heading-row">
+            <div class="heading-left"><small data-bind="subject">GENERAL KNOWLEDGE</small><h1 data-bind="title">Important<br>MCQs</h1></div>
+            <div class="heading-right"><small data-bind="examType">MOCK EXAMINATION</small><strong data-bind="examName">ADRE<br>General<br>Knowledge</strong></div>
+          </div>
+          <div class="question-card">
+            <div class="question-label">PRACTICE QUESTION</div>
+            <p class="question-text" data-bind="question">Who is the Education Minister of Assam?</p>
+            <div class="options">
+              <div class="option"><b>A.</b><span data-bind="optA">Ranoj Pegu</span></div>
+              <div class="option"><b>B.</b><span data-bind="optB">Himanta Biswa Sarma</span></div>
+              <div class="option"><b>C.</b><span data-bind="optC">Gaurav Gogoi</span></div>
+              <div class="option"><b>D.</b><span data-bind="optD">Nitin Gadkari</span></div>
+            </div>
+          </div>
+          <div class="bottom-row">
+            <div class="stat-card"><small>QUESTIONS</small><strong data-bind="questions">120</strong></div>
+            <div class="stat-card"><small>TIME LIMIT</small><strong data-bind="time">30 Min</strong></div>
+            <div class="qr-area"><div class="qr-frame"><img class="qr-image" alt="QR Code"></div><div class="qr-caption">SCAN TO START</div></div>
+          </div>
+          <div class="footer"><strong>PrepareKora.in</strong><span>Learn · Practice · Succeed</span></div>
         </div>
-
-        <nav class="main-navigation" aria-label="Main navigation">
-
-            <button
-                type="button"
-                class="nav-button active"
-                data-view-target="pdfBuilderView"
-                aria-current="page"
-            >
-                PDF Builder
-            </button>
-
-            <button
-                type="button"
-                class="nav-button"
-                data-view-target="thumbnailView"
-            >
-                Thumbnail Maker
-            </button>
-
-            <a
-                href="mcq-image-maker.html"
-                class="nav-link"
-            >
-                MCQ Image Maker
-            </a>
-
-        </nav>
-
-    </header>
-
-
-    <!-- ================= MAIN APPLICATION ================= -->
-
-    <main class="app-container">
-
-
-        <!-- ==================================================
-             PDF BUILDER
-        =================================================== -->
-
-        <section
-            id="pdfBuilderView"
-            class="app-view active"
-        >
-
-            <div class="section-heading">
-
-                <div>
-                    <p class="section-eyebrow">TEST CREATION</p>
-                    <h1>MCQ PDF Builder</h1>
-                    <p class="section-description">
-                        Create bilingual English and Assamese MCQ question papers.
-                    </p>
-                </div>
-
-            </div>
-
-
-            <!-- TEST INFORMATION -->
-
-            <section class="panel">
-
-                <div class="panel-heading">
-                    <h2>Test Information</h2>
-                    <p>Enter the basic details of your test.</p>
-                </div>
-
-
-                <div class="form-grid">
-
-                    <!-- SUBJECT -->
-
-                    <div class="form-group">
-
-                        <label for="subjectSelect">
-                            Subject
-                        </label>
-
-                        <select id="subjectSelect" required>
-
-                            <option value="">Select Subject</option>
-
-                            <option value="Mathematics">Mathematics</option>
-                            <option value="Reasoning">Reasoning</option>
-                            <option value="General Knowledge">General Knowledge</option>
-                            <option value="History">History</option>
-                            <option value="Geography">Geography</option>
-                            <option value="Current Affairs">Current Affairs</option>
-                            <option value="Computer">Computer</option>
-                            <option value="Custom">Custom</option>
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- CUSTOM SUBJECT -->
-
-                    <div
-                        class="form-group"
-                        id="customSubjectGroup"
-                        hidden
-                    >
-
-                        <label for="customSubject">
-                            Custom Subject Name
-                        </label>
-
-                        <input
-                            type="text"
-                            id="customSubject"
-                            placeholder="Enter subject name"
-                            maxlength="60"
-                        >
-
-                    </div>
-
-
-                    <!-- TEST TITLE -->
-
-                    <div class="form-group">
-
-                        <label for="testTitle">
-                            Test Title
-                        </label>
-
-                        <input
-                            type="text"
-                            id="testTitle"
-                            placeholder="e.g. General Knowledge Mock Test - Series III"
-                            maxlength="120"
-                            required
-                        >
-
-                    </div>
-
-
-                    <!-- EXAM TYPE -->
-
-                    <div class="form-group">
-
-                        <label for="examType">
-                            Exam Type
-                        </label>
-
-                        <input
-                            type="text"
-                            id="examType"
-                            placeholder="e.g. MOCK EXAMINATION"
-                            maxlength="80"
-                        >
-
-                    </div>
-
-
-                    <!-- EXAM NAME -->
-
-                    <div class="form-group">
-
-                        <label for="examName">
-                            Exam Name
-                        </label>
-
-                        <input
-                            type="text"
-                            id="examName"
-                            placeholder="e.g. ADRE"
-                            maxlength="100"
-                        >
-
-                    </div>
-
-
-                    <!-- QR URL -->
-
-                    <div class="form-group">
-
-                        <label for="qrUrl">
-                            Test / QR Destination URL
-                        </label>
-
-                        <input
-                            type="url"
-                            id="qrUrl"
-                            placeholder="https://example.com/test"
-                        >
-
-                        <small>
-                            Enter the actual destination for the test QR code.
-                        </small>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-
-            <!-- MCQ INPUT -->
-
-            <section class="panel mcq-input-panel">
-
-                <div class="panel-heading">
-
-                    <h2>MCQ Questions</h2>
-
-                    <p>
-                        Paste all English and Assamese questions into this single input box.
-                    </p>
-
-                </div>
-
-
-                <div class="format-notice">
-
-                    <strong>Required format</strong>
-
-                    <p>
-                        Each English question must be followed by its matching Assamese
-                        question. Use the section markers exactly as shown.
-                    </p>
-
-                    <div class="format-markers">
-                        <code>@@ENGLISH</code>
-                        <code>@@ASSAMESE</code>
-                    </div>
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label for="mcqInput">
-                        Paste Your MCQs
-                    </label>
-
-                    <textarea
-                        id="mcqInput"
-                        rows="22"
-                        spellcheck="false"
-                        placeholder="@@ENGLISH
-Q1. Enter your English question here?
-
-A) English option A
-B) English option B
-C) English option C
-D) English option D
-
-Ans: A
-
-@@ASSAMESE
-Q1. ইয়াত অসমীয়া প্ৰশ্ন লিখক?
-
-A) অসমীয়া বিকল্প ক
-B) অসমীয়া বিকল্প খ
-C) অসমীয়া বিকল্প গ
-D) অসমীয়া বিকল্প ঘ
-
-Ans: A
-
-@@ENGLISH
-Q2. Enter your next English question?
-
-A) English option A
-B) English option B
-C) English option C
-D) English option D
-
-Ans: B
-
-@@ASSAMESE
-Q2. ইয়াত পৰৱৰ্তী অসমীয়া প্ৰশ্ন লিখক?
-
-A) অসমীয়া বিকল্প ক
-B) অসমীয়া বিকল্প খ
-C) অসমীয়া বিকল্প গ
-D) অসমীয়া বিকল্প ঘ
-
-Ans: B"
-                    ></textarea>
-
-                    <small>
-                        Every question requires exactly four options and one valid answer
-                        in both languages.
-                    </small>
-
-                </div>
-
-
-                <!-- CREATE BUTTON -->
-
-                <div class="builder-actions">
-
-                    <button
-                        type="button"
-                        id="createTestBtn"
-                        class="primary-button"
-                    >
-                        Create PDF
-                    </button>
-
-                    <button
-                        type="button"
-                        id="clearInputBtn"
-                        class="secondary-button"
-                    >
-                        Clear
-                    </button>
-
-                </div>
-
-
-                <!-- VALIDATION MESSAGE -->
-
-                <div
-                    id="validationMessage"
-                    class="validation-message"
-                    role="status"
-                    aria-live="polite"
-                    hidden
-                ></div>
-
-            </section>
-
-
-            <!-- GENERATED TEST DETAILS -->
-
-            <section
-                id="generatedTestPanel"
-                class="panel generated-panel"
-                hidden
-            >
-
-                <div class="panel-heading">
-
-                    <p class="section-eyebrow">SUCCESSFULLY CREATED</p>
-
-                    <h2>Your Test Is Ready</h2>
-
-                    <p>
-                        Your PDF and thumbnail will use the same generated test data.
-                    </p>
-
-                </div>
-
-
-                <div class="generated-details">
-
-                    <div class="detail-item">
-                        <span>MT ID</span>
-                        <strong id="generatedMtId">—</strong>
-                    </div>
-
-                    <div class="detail-item">
-                        <span>Subject</span>
-                        <strong id="generatedSubject">—</strong>
-                    </div>
-
-                    <div class="detail-item">
-                        <span>Total Questions</span>
-                        <strong id="generatedQuestionCount">—</strong>
-                    </div>
-
-                    <div class="detail-item">
-                        <span>Total Pages</span>
-                        <strong id="generatedPageCount">—</strong>
-                    </div>
-
-                </div>
-
-
-                <div class="builder-actions">
-
-                    <button
-                        type="button"
-                        id="downloadPdfBtn"
-                        class="primary-button"
-                    >
-                        Download PDF
-                    </button>
-
-                    <button
-                        type="button"
-                        id="createThumbnailBtn"
-                        class="secondary-button"
-                    >
-                        Create Thumbnail
-                    </button>
-
-                </div>
-
-            </section>
-
-        </section>
-
-
-        <!-- ==================================================
-             THUMBNAIL MAKER
-        =================================================== -->
-
-        <section
-            id="thumbnailView"
-            class="app-view"
-            hidden
-        >
-
-            <div class="section-heading">
-
-                <div>
-                    <p class="section-eyebrow">TEST PROMOTION</p>
-
-                    <h1>Thumbnail Maker</h1>
-
-                    <p class="section-description">
-                        Create a matching thumbnail using your generated test information.
-                    </p>
-                </div>
-
-            </div>
-
-
-            <div
-                id="thumbnailNotice"
-                class="validation-message"
-                role="status"
-                aria-live="polite"
-            >
-                Create a PDF first to load its test information here.
-            </div>
-
-
-            <!--
-                ORIGINAL THUMBNAIL MAKER STRUCTURE
-
-                The existing Thumbnail Maker's original interface,
-                input fields, banner preview, toolbar and markup
-                will be integrated here.
-
-                Preserve:
-                1. Original 16:9 landscape design.
-                2. Original 9:16 portrait design.
-                3. Original PNG download functionality.
-                4. Original manual input fields where required.
-
-                Existing input IDs to retain:
-                in-mtId
-                in-subject
-                in-title
-                in-examType
-                in-questions
-                in-examName
-                in-question
-                in-optA
-                in-optB
-                in-optC
-                in-optD
-                in-time
-                in-url
-
-                Original preview ID:
-                banner
-
-                Do not connect this interface to the
-                independent MCQ Image Maker.
-            -->
-
-            <div id="thumbnailMakerMount">
-
-                <div class="integration-placeholder">
-
-                    <h2>Thumbnail Workspace</h2>
-
-                    <p>
-                        The existing 16:9 and 9:16 Thumbnail Maker interface
-                        will be integrated in this workspace.
-                    </p>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-    </main>
-
-
-    <!-- ================= APP FOOTER ================= -->
-
-    <footer class="app-footer">
-
-        <span>PREPAREKORA.IN</span>
-
-        <span>PrepareKora Studio</span>
-
-    </footer>
-
-
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="state.js"></script>
+<script src="mcq.js"></script>
+<script src="thumbnail.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
