@@ -1,12 +1,5 @@
-/* ================================================================
-   mcq.js — PrepareKora MCQ Paper Builder (v3 — digital text PDF)
-   PDF is produced via browser print-to-PDF (window.print) so
-   Bengali conjuncts shape correctly and text stays selectable.
-   ================================================================ */
 (function initMCQ(global){
   'use strict';
-
-  /* ---------------- PARSER ---------------- */
 
   function splitBi(raw){
     const s = String(raw == null ? '' : raw);
@@ -79,8 +72,6 @@
     flush();
     return { title: title, questions: questions };
   }
-
-  /* ---------------- PDF LAYOUT CSS ---------------- */
 
   const PDF_CSS = `
   .pk-pdf-root { position: fixed; left: -10000px; top: 0; z-index: -1; pointer-events: none; }
@@ -199,8 +190,6 @@
     document.head.appendChild(style);
   }
 
-  /* ---------------- PDF HTML BUILDER ---------------- */
-
   function escHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
@@ -223,7 +212,6 @@
     const isEn = lang === 'en';
     const card = document.createElement('div');
     card.className = 'language-card ' + (isEn ? 'english' : 'assamese');
-
     const qText = isEn ? (q.qEn || '') : (q.qAs || '');
     const numText = isEn ? 'Q' + number + '.' : 'প্ৰশ্ন ' + assameseNumber(number) + '.';
 
@@ -249,7 +237,6 @@
         escHtml(qText) + '</div>' +
       '<div class="options">' + optsHtml + '</div>' +
       (answerHtml ? '<div class="answer">' + answerHtml + '</div>' : '');
-
     return card;
   }
 
@@ -297,8 +284,6 @@
     return sheet;
   }
 
-  /* ---------------- FONT + ASSET WAITING ---------------- */
-
   async function waitForFonts(){
     if(!document.fonts || !document.fonts.ready) return;
     try{
@@ -311,7 +296,7 @@
         document.fonts.load('600 12px "Hind Siliguri"'),
         document.fonts.load('700 12px "Hind Siliguri"')
       ]);
-    }catch(e){ /* ignore */ }
+    }catch(e){}
   }
 
   function waitForImages(root){
@@ -326,11 +311,34 @@
     }));
   }
 
-  /* ---------------- DIGITAL PDF VIA PRINT ---------------- */
+  /* ---------------- DIGITAL PDF (iframe print) ---------------- */
+  async function generatePDF(testData, onProgress){
+    ensurePdfStyles();
 
-  function buildPrintDocument(sheetsHtml, title){
-    return '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-      '<title>' + escHtml(title || 'MCQ Paper') + '</title>' +
+    const perPage = 5;
+    const total = testData.questions.length;
+    const totalPages = Math.ceil(total / perPage);
+    const qrUrl = getQRUrl();
+
+    const sheetsHtml = [];
+    for(let p = 0; p < totalPages; p++){
+      const slice = testData.questions.slice(p * perPage, (p + 1) * perPage);
+      const sheet = buildSheet(testData, slice, p * perPage, p + 1, totalPages, qrUrl);
+      sheetsHtml.push(sheet.outerHTML);
+    }
+
+    if(typeof onProgress === 'function') onProgress('preparing');
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0;pointer-events:none;';
+    document.body.appendChild(iframe);
+
+    const idoc = iframe.contentDocument || iframe.contentWindow.document;
+    idoc.open();
+    idoc.write(
+      '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+      '<title>' + escHtml(testData.title || 'MCQ Paper') + '</title>' +
       '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">' +
       '<style>' +
         '@page { size: A4 portrait; margin: 0; }' +
@@ -340,23 +348,42 @@
         '.pk-pdf-root .sheet { page-break-after: always; break-after: page; box-shadow: none; }' +
         '.pk-pdf-root .sheet:last-child { page-break-after: auto; break-after: auto; }' +
       '</style></head><body><div class="pk-pdf-root">' +
-      sheetsHtml +
-      '</div></body></html>';
+        sheetsHtml.join('') +
+      '</div></body></html>'
+    );
+    idoc.close();
+
+    try{ await idoc.fonts.ready; }catch(e){}
+
+    const imgs = Array.prototype.slice.call(idoc.querySelectorAll('img'));
+    await Promise.all(imgs.map(function(img){
+      return new Promise(function(resolve){
+        if(img.complete && img.naturalWidth > 0) return resolve();
+        img.onload = resolve;
+        img.onerror = function(){ img.style.visibility = 'hidden'; resolve(); };
+        setTimeout(resolve, 6000);
+      });
+    }));
+
+    await new Promise(function(r){ setTimeout(r, 250); });
+
+    if(typeof onProgress === 'function') onProgress('printing');
+    try{ iframe.contentWindow.focus(); }catch(e){}
+    iframe.contentWindow.print();
+
+    const cleanup = function(){
+      if(iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    };
+    try{ iframe.contentWindow.addEventListener('afterprint', cleanup); }catch(e){}
+    setTimeout(cleanup, 90000);
   }
 
-  async function generatePDF(testData, onProgress){
-    ensurePdfStyles();
+  /* ---------------- RASTER PDF (auto-download) ---------------- */
+  async function generateRasterPDF(testData, onProgress){
+    if(typeof global.html2canvas !== 'function') throw new Error('Rendering library not loaded. Refresh page.');
+    if(!global.jspdf || !global.jspdf.jsPDF) throw new Error('PDF library not loaded. Refresh page.');
 
-    /* Open print window SYNCHRONOUSLY to survive popup blockers. */
-    const printWin = global.open('', '_blank');
-    if(!printWin){
-      throw new Error('Popup blocked. Allow popups for this site, then click Create again.');
-    }
-    printWin.document.write(
-      '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;color:#333">' +
-      'Preparing digital PDF… please wait.</body></html>'
-    );
-    printWin.document.close();
+    ensurePdfStyles();
 
     const perPage = 5;
     const total = testData.questions.length;
@@ -365,58 +392,69 @@
 
     const root = document.createElement('div');
     root.className = 'pk-pdf-root';
-
     for(let p = 0; p < totalPages; p++){
       const slice = testData.questions.slice(p * perPage, (p + 1) * perPage);
       root.appendChild(buildSheet(testData, slice, p * perPage, p + 1, totalPages, qrUrl));
     }
-
     document.body.appendChild(root);
 
     try{
-      if(typeof onProgress === 'function') onProgress('preparing');
       await waitForFonts();
       await waitForImages(root);
-      await new Promise(function(r){ setTimeout(r, 120); });
+      await new Promise(function(r){ setTimeout(r, 80); });
 
-      const sheetsHtml = root.innerHTML;
-
-      printWin.document.open();
-      printWin.document.write(buildPrintDocument(sheetsHtml, testData.title));
-      printWin.document.close();
-
-      /* Wait for print window resources */
-      await new Promise(function(resolve){
-        const check = function(){
-          if(printWin.document.readyState === 'complete') resolve();
-          else setTimeout(check, 100);
-        };
-        check();
+      const doc = new global.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      doc.setProperties({
+        title: testData.title || 'MCQ Paper',
+        subject: testData.subject || '',
+        author: 'PrepareKora.in',
+        creator: 'PrepareKora Studio'
       });
 
-      try{ await printWin.document.fonts.ready; }catch(e){}
-
-      const printImgs = Array.prototype.slice.call(printWin.document.querySelectorAll('img'));
-      await Promise.all(printImgs.map(function(img){
-        return new Promise(function(resolve){
-          if(img.complete && img.naturalWidth > 0) return resolve();
-          img.onload = resolve;
-          img.onerror = resolve;
-          setTimeout(resolve, 6000);
+      const sheets = root.querySelectorAll('.sheet');
+      for(let i = 0; i < sheets.length; i++){
+        if(typeof onProgress === 'function') onProgress(i + 1, sheets.length);
+        const canvas = await global.html2canvas(sheets[i], {
+          scale: 3,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          allowTaint: false,
+          logging: false,
+          windowWidth: sheets[i].offsetWidth,
+          windowHeight: sheets[i].offsetHeight
         });
-      }));
-
-      await new Promise(function(r){ setTimeout(r, 300); });
-
-      if(typeof onProgress === 'function') onProgress('printing');
-      printWin.focus();
-      printWin.print();
+        const imgData = canvas.toDataURL('image/png');
+        if(i > 0) doc.addPage();
+        doc.addImage(imgData, 'PNG', 0, 0, 210, 297);
+      }
+      return doc.output('blob');
     } finally {
       if(root.parentNode) root.parentNode.removeChild(root);
     }
   }
 
-  /* ---------------- UI WIRING ---------------- */
+  function slugify(s){
+    return String(s == null ? '' : s)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'paper';
+  }
+
+  function filenameFor(testData){
+    const id = String(testData.mtId || 'MT').replace(/[^a-z0-9]+/gi, '-');
+    return 'PrepareKora_' + id + '_' + slugify(testData.title) + '.pdf';
+  }
+
+  function downloadBlob(blob, filename){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+  }
 
   function wire(){
     const subjectSel  = document.getElementById('paper-subject');
@@ -428,6 +466,7 @@
     const msgEl       = document.getElementById('paper-msg');
     const summaryEl   = document.getElementById('paper-summary');
     const openPdfBtn  = document.getElementById('paper-open-pdf');
+    const rasterBtn   = document.getElementById('paper-download-raster');
     const thumbBtn    = document.getElementById('paper-thumb-btn');
     const sumMtId     = document.getElementById('sum-mtid');
     const sumSubject  = document.getElementById('sum-subject');
@@ -494,19 +533,17 @@
           questions: parsed.questions
         });
 
-        await generatePDF(draft, function(stage){
-          if(stage === 'preparing') createBtn.textContent = 'Preparing digital PDF…';
-          else if(stage === 'printing') createBtn.textContent = 'Opening print dialog…';
-        });
-
         const consumedId = PKState.consumeMTId(subject);
         draft.mtId = consumedId;
-
         PKState.save(draft);
         renderSummary(draft);
 
-        setMsg('Ready — Save as PDF from the print dialog (Choose "Save as PDF") · ' +
-               draft.mtId + ' · ' + draft.totalQuestions + ' questions', true);
+        await generatePDF(draft, function(stage){
+          if(stage === 'preparing') createBtn.textContent = 'Preparing…';
+          else if(stage === 'printing') createBtn.textContent = 'Opening print dialog…';
+        });
+
+        setMsg('Choose "Save as PDF" in the print dialog · ' + draft.mtId + ' · ' + draft.totalQuestions + ' questions', true);
         summaryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         window.dispatchEvent(new CustomEvent('pk:papercreated', { detail: draft }));
       }catch(err){
@@ -540,6 +577,32 @@
       }
     });
 
+    if(rasterBtn){
+      rasterBtn.addEventListener('click', async function(){
+        setMsg('');
+        const data = PKState.get();
+        if(!data || !data.questions || !data.questions.length){
+          setMsg('No test data available. Click Create first.');
+          return;
+        }
+        rasterBtn.disabled = true;
+        const label = rasterBtn.textContent;
+        try{
+          const blob = await generateRasterPDF(data, function(page, total){
+            rasterBtn.textContent = 'Rendering ' + page + '/' + total + '…';
+          });
+          downloadBlob(blob, filenameFor(data));
+          setMsg('Raster PDF downloaded (image-based, not selectable).', true);
+        }catch(err){
+          console.error(err);
+          setMsg('Raster PDF failed: ' + (err && err.message ? err.message : err));
+        }finally{
+          rasterBtn.disabled = false;
+          rasterBtn.textContent = label;
+        }
+      });
+    }
+
     thumbBtn.addEventListener('click', function(){
       if(global.PKApp && typeof global.PKApp.switchTool === 'function'){
         global.PKApp.switchTool('thumb');
@@ -559,7 +622,8 @@
   global.PKMCQ = {
     splitBi: splitBi,
     parseMCQs: parseMCQs,
-    generatePDF: generatePDF
+    generatePDF: generatePDF,
+    generateRasterPDF: generateRasterPDF
   };
 
 })(window);
