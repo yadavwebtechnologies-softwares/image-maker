@@ -1,25 +1,12 @@
 /* ================================================================
    mcq.js — PrepareKora MCQ Paper Builder (v2 — bilingual A4 layout)
-   Two-column bilingual A4 PDF, matching the reference design:
-     • header: brand · subject · MT ID · QR
-     • 5 questions per page
-     • English card (left) + Assamese card (right) per question
-     • 2×2 options grid inside each card
-     • correct answer at bottom of each card
-     • footer: brand · subject · page X / Y
-
-   PDF generation approach:
-     HTML render → html2canvas per page → jsPDF image per page.
-     (jsPDF vector text cannot shape Bengali conjuncts correctly;
-      html2canvas uses the browser's own text engine, so Bengali
-      renders exactly as in the reference.)
+   PDF generation: HTML render → html2canvas per page → jsPDF image.
+   (jsPDF vector text cannot shape Bengali conjuncts correctly.)
    ================================================================ */
 (function initMCQ(global){
   'use strict';
 
-  /* ==========================================================
-     PARSER  (unchanged from previous version)
-     ========================================================== */
+  /* ---------------- PARSER ---------------- */
 
   function splitBi(raw){
     const s = String(raw == null ? '' : raw);
@@ -93,9 +80,7 @@
     return { title: title, questions: questions };
   }
 
-  /* ==========================================================
-     PDF LAYOUT — scoped CSS injected once
-     ========================================================== */
+  /* ---------------- PDF LAYOUT CSS ---------------- */
 
   const PDF_CSS = `
   .pk-pdf-root { position: fixed; left: -10000px; top: 0; z-index: -1; pointer-events: none; }
@@ -123,17 +108,19 @@
   }
   .pk-pdf-root .header-brand {
     font-size: 8pt; font-weight: 700; color: #111; letter-spacing: -0.2px;
+    line-height: 1;
   }
   .pk-pdf-root .header-brand .in { color: #999; }
   .pk-pdf-root .header-subject {
     font-size: 8pt; font-weight: 600; color: #444;
     padding-left: 4mm; border-left: 0.2mm solid #d5d5d5;
-    text-align: center;
+    text-align: center; line-height: 1;
     overflow: hidden; text-overflow: ellipsis;
   }
   .pk-pdf-root .header-id {
     font-size: 8pt; font-weight: 600; color: #444;
     padding-left: 4mm; border-left: 0.2mm solid #d5d5d5;
+    line-height: 1;
   }
   .pk-pdf-root .header-qr {
     width: 10mm; height: 10mm; display: block; object-fit: contain; flex-shrink: 0;
@@ -162,18 +149,21 @@
     font-family: "Times New Roman", Times, serif;
   }
   .pk-pdf-root .language-card.assamese {
-    font-family: "Noto Sans Bengali", "Nirmala UI", sans-serif;
+    font-family: "Hind Siliguri", "Noto Sans Bengali", "Nirmala UI", sans-serif;
   }
   .pk-pdf-root .question {
     font-size: 11pt; font-weight: 700; line-height: 1.35;
-    margin: 0 0 3mm; color: #111;
+    margin: 0 0 2mm; color: #111;
   }
-  .pk-pdf-root .language-card.assamese .question { font-size: 10.5pt; }
+  .pk-pdf-root .language-card.assamese .question { font-size: 10.5pt; font-weight: 600; }
+  .pk-pdf-root .language-card.assamese .option { font-weight: 500; }
+  .pk-pdf-root .language-card.assamese .option-label { font-weight: 600; }
+  .pk-pdf-root .language-card.assamese .answer { font-weight: 600; }
   .pk-pdf-root .question-number { font-weight: 700; white-space: nowrap; }
   .pk-pdf-root .options {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 3mm; row-gap: 2.2mm;
+    column-gap: 2.5mm; row-gap: 1.5mm;
     font-size: 9.5pt; line-height: 1.3;
   }
   .pk-pdf-root .option {
@@ -182,8 +172,8 @@
   }
   .pk-pdf-root .option-label { flex-shrink: 0; font-weight: 700; }
   .pk-pdf-root .answer {
-    margin-top: auto;
-    padding-top: 2.5mm;
+    margin-top: 1.5mm;
+    padding-top: 1.5mm;
     border-top: 0.2mm solid #e1e1e1;
     font-size: 9pt; font-weight: 700; line-height: 1.3;
   }
@@ -209,9 +199,7 @@
     document.head.appendChild(style);
   }
 
-  /* ==========================================================
-     PDF HTML BUILDER
-     ========================================================== */
+  /* ---------------- PDF HTML BUILDER ---------------- */
 
   function escHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
@@ -277,7 +265,6 @@
     const sheet = document.createElement('section');
     sheet.className = 'sheet';
 
-    /* Header */
     const header = document.createElement('header');
     header.className = 'page-header';
     header.innerHTML =
@@ -290,7 +277,6 @@
                 encodeURIComponent(qrUrl);
     sheet.appendChild(header);
 
-    /* Question grid */
     const grid = document.createElement('main');
     grid.className = 'question-grid';
     questions.forEach(function(q, i){
@@ -298,7 +284,6 @@
     });
     sheet.appendChild(grid);
 
-    /* Footer */
     const footer = document.createElement('footer');
     footer.className = 'page-footer';
     footer.innerHTML =
@@ -312,9 +297,7 @@
     return sheet;
   }
 
-  /* ==========================================================
-     FONT + ASSET WAITING
-     ========================================================== */
+  /* ---------------- FONT + ASSET WAITING ---------------- */
 
   async function waitForFonts(){
     if(!document.fonts || !document.fonts.ready) return;
@@ -322,7 +305,11 @@
       await document.fonts.ready;
       await Promise.all([
         document.fonts.load('400 12px "Noto Sans Bengali"'),
-        document.fonts.load('700 12px "Noto Sans Bengali"')
+        document.fonts.load('700 12px "Noto Sans Bengali"'),
+        document.fonts.load('400 12px "Hind Siliguri"'),
+        document.fonts.load('500 12px "Hind Siliguri"'),
+        document.fonts.load('600 12px "Hind Siliguri"'),
+        document.fonts.load('700 12px "Hind Siliguri"')
       ]);
     }catch(e){ /* ignore */ }
   }
@@ -339,9 +326,7 @@
     }));
   }
 
-  /* ==========================================================
-     PDF GENERATOR
-     ========================================================== */
+  /* ---------------- PDF GENERATOR ---------------- */
 
   async function generatePDF(testData, onProgress){
     if(typeof global.html2canvas !== 'function'){
@@ -371,7 +356,6 @@
     try{
       await waitForFonts();
       await waitForImages(root);
-      /* One extra rAF + tick so layout settles before snapshot */
       await new Promise(function(r){ setTimeout(r, 80); });
 
       const doc = new global.jspdf.jsPDF({
@@ -390,7 +374,7 @@
         if(typeof onProgress === 'function') onProgress(i + 1, sheets.length);
 
         const canvas = await global.html2canvas(sheets[i], {
-          scale: 2,
+          scale: 3,
           backgroundColor: '#ffffff',
           useCORS: true,
           allowTaint: false,
@@ -411,9 +395,7 @@
     }
   }
 
-  /* ==========================================================
-     FILE HELPERS
-     ========================================================== */
+  /* ---------------- FILE HELPERS ---------------- */
 
   function slugify(s){
     return String(s == null ? '' : s)
@@ -438,9 +420,7 @@
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
   }
 
-  /* ==========================================================
-     UI WIRING
-     ========================================================== */
+  /* ---------------- UI WIRING ---------------- */
 
   function wire(){
     const subjectSel  = document.getElementById('paper-subject');
@@ -582,10 +562,6 @@
   } else {
     wire();
   }
-
-  /* ==========================================================
-     EXPORT
-     ========================================================== */
 
   global.PKMCQ = {
     splitBi: splitBi,
