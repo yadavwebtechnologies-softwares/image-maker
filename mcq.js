@@ -205,15 +205,10 @@
   function getQRUrl(){
     const paperInput = document.getElementById('paper-qr-url');
     if(paperInput && paperInput.value.trim()) return paperInput.value.trim();
-
-    const thumbInput = document.getElementById('in-url');
-    if(thumbInput && thumbInput.value.trim()) return thumbInput.value.trim();
-
     try{
       const stored = localStorage.getItem('pk.qrDefault');
       if(stored && stored.trim()) return stored.trim();
     }catch(e){}
-
     return 'https://chat.whatsapp.com/DLrcA98MrlYKOeZ5DMeN5Z?s=cl&p=a&iam=2';
   }
 
@@ -320,7 +315,6 @@
     }));
   }
 
-  /* ---------------- DIGITAL PDF (iframe print) ---------------- */
   async function generatePDF(testData, onProgress){
     ensurePdfStyles();
 
@@ -387,7 +381,6 @@
     setTimeout(cleanup, 90000);
   }
 
-  /* ---------------- RASTER PDF (auto-download) ---------------- */
   async function generateRasterPDF(testData, onProgress){
     if(typeof global.html2canvas !== 'function') throw new Error('Rendering library not loaded. Refresh page.');
     if(!global.jspdf || !global.jspdf.jsPDF) throw new Error('PDF library not loaded. Refresh page.');
@@ -470,6 +463,8 @@
     const customWrap  = document.getElementById('paper-custom-wrap');
     const customInput = document.getElementById('paper-custom-subject');
     const titleInput  = document.getElementById('paper-title');
+    const examTypeInput = document.getElementById('paper-exam-type');
+    const examNameInput = document.getElementById('paper-exam-name');
     const inputEl     = document.getElementById('paper-input');
     const createBtn   = document.getElementById('paper-create');
     const msgEl       = document.getElementById('paper-msg');
@@ -481,31 +476,41 @@
     const sumSubject  = document.getElementById('sum-subject');
     const sumTitle    = document.getElementById('sum-title');
     const sumCount    = document.getElementById('sum-count');
+    const previewEl   = document.getElementById('paper-id-preview');
+    const nextIdEl    = document.getElementById('paper-next-id');
+    const issuedEl    = document.getElementById('paper-issued-count');
+    const qrInput     = document.getElementById('paper-qr-url');
 
     if(!createBtn) return;
 
-    /* QR URL field — persists and syncs to thumbnail's #in-url */
-    const qrInput = document.getElementById('paper-qr-url');
-    const thumbUrlInput = document.getElementById('in-url');
     if(qrInput){
       try{
         const storedQR = localStorage.getItem('pk.qrDefault');
         if(storedQR) qrInput.value = storedQR;
       }catch(e){}
       qrInput.addEventListener('input', function(){
-        const v = qrInput.value;
-        try{ localStorage.setItem('pk.qrDefault', v); }catch(e){}
-        if(thumbUrlInput && thumbUrlInput.value !== v){
-          thumbUrlInput.value = v;
-          thumbUrlInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+        try{ localStorage.setItem('pk.qrDefault', qrInput.value); }catch(e){}
       });
+    }
+
+    function updateIdPreview(){
+      if(!previewEl) return;
+      let subject = subjectSel.value;
+      if(subject === 'Custom') subject = customInput.value.trim();
+      if(!subject){ previewEl.hidden = true; return; }
+      previewEl.hidden = false;
+      nextIdEl.textContent = PKState.peekMTId(subject);
+      const issued = PKState.getSerial(subject);
+      issuedEl.textContent = issued + ' issued';
     }
 
     subjectSel.addEventListener('change', function(){
       customWrap.hidden = subjectSel.value !== 'Custom';
       if(!customWrap.hidden) customInput.focus();
+      updateIdPreview();
     });
+    customInput.addEventListener('input', updateIdPreview);
+    updateIdPreview();
 
     function setMsg(text, ok){
       msgEl.className = 'msg' + (ok ? ' ok' : '');
@@ -513,7 +518,8 @@
     }
 
     function renderSummary(data){
-      sumMtId.textContent    = data.mtId;
+      const issued = PKState.getSerial(data.subject);
+      sumMtId.textContent    = data.mtId + (issued > 0 ? ' · ' + issued + ' issued' : '');
       sumSubject.textContent = data.subject;
       sumTitle.textContent   = data.title;
       sumCount.textContent   = data.totalQuestions +
@@ -557,6 +563,9 @@
           mtId:      peekedId,
           subject:   subject,
           title:     titleInput.value.trim() || parsed.title || '',
+          examType:  examTypeInput ? examTypeInput.value.trim() : '',
+          examName:  examNameInput ? examNameInput.value.trim() : '',
+          qrUrl:     getQRUrl(),
           questions: parsed.questions
         });
 
@@ -564,6 +573,7 @@
         draft.mtId = consumedId;
         PKState.save(draft);
         renderSummary(draft);
+        updateIdPreview();
 
         await generatePDF(draft, function(stage){
           if(stage === 'preparing') createBtn.textContent = 'Preparing…';
