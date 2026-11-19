@@ -1,11 +1,3 @@
-/* ================================================================
-   thumbnail.js — PrepareKora Thumbnail Maker
-   Ported verbatim from the original single-file app, adapted to:
-     • read auto-fillable fields from PKState (shared test data)
-     • keep all visual/export logic unchanged
-     • expose setFormat / downloadBanner / resetDefaults for inline onclick
-     • expose window.ThumbTool.refresh() for tab switching
-   ================================================================ */
 (function initThumb(global){
   'use strict';
 
@@ -14,11 +6,10 @@
   const thumbLandscapeBtn = document.getElementById('landscapeBtn');
   const thumbScope        = document.getElementById('tool-thumb');
 
-  if(!thumbBanner || !thumbScope) return; // safety: DOM not ready
+  if(!thumbBanner || !thumbScope) return;
 
-  /* ---------- defaults (unchanged from original) ---------- */
   const DEFAULT_DATA = {
-    mtId:      'MT/GK/0001',
+    mtId:      'MT-GK-003',
     subject:   'GENERAL KNOWLEDGE',
     title:     'Important\nMCQs',
     examType:  'MOCK EXAMINATION',
@@ -30,34 +21,22 @@
     optD:      'Nitin Gadkari',
     questions: '120',
     time:      '30 Min',
+    marks:     '50',
     url:       'https://chat.whatsapp.com/DLrcA98MrlYKOeZ5DMeN5Z?s=cl&p=a&iam=2'
   };
 
   const INPUT_MAP = {
-    'in-mtId':      'mtId',
-    'in-subject':   'subject',
-    'in-title':     'title',
-    'in-examType':  'examType',
-    'in-examName':  'examName',
-    'in-question':  'question',
-    'in-optA':      'optA',
-    'in-optB':      'optB',
-    'in-optC':      'optC',
-    'in-optD':      'optD',
-    'in-questions': 'questions',
-    'in-time':      'time',
-    'in-url':       'url'
+    'in-question': 'question',
+    'in-optA':     'optA',
+    'in-optB':     'optB',
+    'in-optC':     'optC',
+    'in-optD':     'optD',
+    'in-time':     'time',
+    'in-marks':    'marks'
   };
-
-  /* Fields that are MANUAL-ONLY — never overwritten by test data sync.
-     (Documented here for clarity; they are simply absent from syncFromTestData.) */
 
   let thumbState = Object.assign({}, DEFAULT_DATA);
   let lastQRUrl  = '';
-
-  /* ==========================================================
-     Persistence
-     ========================================================== */
 
   function loadSaved(){
     try{
@@ -65,16 +44,12 @@
       if(s && typeof s === 'object'){
         thumbState = Object.assign({}, DEFAULT_DATA, s);
       }
-    }catch(e){ /* corrupt — ignore */ }
+    }catch(e){}
   }
 
   function saveThumbState(){
     try{ localStorage.setItem('pk_banner_state', JSON.stringify(thumbState)); }catch(e){}
   }
-
-  /* ==========================================================
-     Helpers
-     ========================================================== */
 
   function escapeHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
@@ -96,10 +71,6 @@
     if(el) el.innerHTML = html == null ? '' : html;
   }
 
-  /* ==========================================================
-     Render
-     ========================================================== */
-
   function renderThumb(){
     setText('mtId',      'MT ID: ' + (thumbState.mtId || ''));
     setText('subject',   thumbState.subject);
@@ -113,6 +84,7 @@
     setText('optD',      thumbState.optD);
     setText('questions', thumbState.questions);
     setText('time',      thumbState.time);
+    setText('marks',     thumbState.marks);
     updateThumbQR();
   }
 
@@ -128,10 +100,6 @@
     img.crossOrigin = 'anonymous';
     img.src = qrSrc;
   }
-
-  /* ==========================================================
-     Input binding
-     ========================================================== */
 
   function populateThumbInputs(){
     Object.keys(INPUT_MAP).forEach(function(id){
@@ -152,10 +120,6 @@
     });
   }
 
-  /* ==========================================================
-     Format toggle (portrait / landscape)
-     ========================================================== */
-
   function setFormat(format){
     thumbBanner.classList.remove('portrait', 'landscape');
     thumbBanner.classList.add(format);
@@ -165,10 +129,6 @@
     thumbLandscapeBtn.classList.toggle('active',    format === 'landscape');
     thumbLandscapeBtn.classList.toggle('secondary', format !== 'landscape');
   }
-
-  /* ==========================================================
-     Export PNG (unchanged logic)
-     ========================================================== */
 
   function waitForQR(){
     const img = thumbBanner.querySelector('.qr-image');
@@ -207,7 +167,6 @@
       clone.style.margin       = '0';
       clone.style.transform    = 'none';
 
-      /* ⭐ CRITICAL: append INSIDE #tool-thumb so scoped CSS + cqw units match */
       thumbScope.appendChild(clone);
 
       const qrImg = clone.querySelector('.qr-image');
@@ -255,10 +214,6 @@
     }
   }
 
-  /* ==========================================================
-     Reset (thumbnail-local only)
-     ========================================================== */
-
   function resetDefaults(){
     if(!confirm('Reset all thumbnail fields to default example?')) return;
     thumbState = Object.assign({}, DEFAULT_DATA);
@@ -267,11 +222,6 @@
     renderThumb();
   }
 
-  /* ==========================================================
-     Auto-sync from shared test data (NEW)
-     Called when PKState.save() fires pk:testdatachanged
-     ========================================================== */
-
   function syncFromTestData(data){
     if(!data) return;
     if(!Array.isArray(data.questions) || data.questions.length === 0) return;
@@ -279,28 +229,23 @@
     const q1   = data.questions[0] || {};
     const opts = Array.isArray(q1.options) ? q1.options : [];
 
-    /* AUTO fields — refreshed on every new test */
     thumbState.mtId      = data.mtId || thumbState.mtId;
     thumbState.subject   = (data.subject || '').toUpperCase() || thumbState.subject;
     thumbState.title     = data.title || thumbState.title;
+    thumbState.examType  = data.examType || thumbState.examType;
+    thumbState.examName  = data.examName || thumbState.examName;
     thumbState.questions = String(data.totalQuestions || data.questions.length || '');
     thumbState.question  = q1.qEn || '';
     thumbState.optA      = (opts[0] && opts[0].en) || '';
     thumbState.optB      = (opts[1] && opts[1].en) || '';
     thumbState.optC      = (opts[2] && opts[2].en) || '';
     thumbState.optD      = (opts[3] && opts[3].en) || '';
-
-    /* MANUAL fields intentionally NOT touched:
-       examType, examName, time, url */
+    if(data.qrUrl) thumbState.url = data.qrUrl;
 
     saveThumbState();
     populateThumbInputs();
     renderThumb();
   }
-
-  /* ==========================================================
-     Public hooks used by inline onclick in index.html
-     ========================================================== */
 
   global.setFormat      = setFormat;
   global.downloadBanner = downloadBanner;
@@ -309,15 +254,9 @@
   global.ThumbTool = {
     refresh: function(){
       renderThumb();
-      /* Force reflow so container-query units (cqw) re-evaluate
-         after the tab becomes visible. */
       void thumbBanner.offsetWidth;
     }
   };
-
-  /* ==========================================================
-     Init
-     ========================================================== */
 
   loadSaved();
   populateThumbInputs();
@@ -325,7 +264,6 @@
   renderThumb();
   setFormat('portrait');
 
-  /* Listen for test-data commits from the Paper Builder. */
   global.addEventListener('pk:testdatachanged', function(e){
     if(e && e.detail) syncFromTestData(e.detail);
   });
