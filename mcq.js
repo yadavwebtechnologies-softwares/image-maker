@@ -203,8 +203,17 @@
   }
 
   function getQRUrl(){
-    const input = document.getElementById('in-url');
-    if(input && input.value.trim()) return input.value.trim();
+    const paperInput = document.getElementById('paper-qr-url');
+    if(paperInput && paperInput.value.trim()) return paperInput.value.trim();
+
+    const thumbInput = document.getElementById('in-url');
+    if(thumbInput && thumbInput.value.trim()) return thumbInput.value.trim();
+
+    try{
+      const stored = localStorage.getItem('pk.qrDefault');
+      if(stored && stored.trim()) return stored.trim();
+    }catch(e){}
+
     return 'https://chat.whatsapp.com/DLrcA98MrlYKOeZ5DMeN5Z?s=cl&p=a&iam=2';
   }
 
@@ -474,6 +483,24 @@
     const sumCount    = document.getElementById('sum-count');
 
     if(!createBtn) return;
+
+    /* QR URL field — persists and syncs to thumbnail's #in-url */
+    const qrInput = document.getElementById('paper-qr-url');
+    const thumbUrlInput = document.getElementById('in-url');
+    if(qrInput){
+      try{
+        const storedQR = localStorage.getItem('pk.qrDefault');
+        if(storedQR) qrInput.value = storedQR;
+      }catch(e){}
+      qrInput.addEventListener('input', function(){
+        const v = qrInput.value;
+        try{ localStorage.setItem('pk.qrDefault', v); }catch(e){}
+        if(thumbUrlInput && thumbUrlInput.value !== v){
+          thumbUrlInput.value = v;
+          thumbUrlInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+    }
 
     subjectSel.addEventListener('change', function(){
       customWrap.hidden = subjectSel.value !== 'Custom';
