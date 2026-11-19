@@ -54,9 +54,23 @@
           <input id="paper-title" type="text">
         </label>
 
+        <label>Exam Type
+          <input id="paper-exam-type" type="text">
+        </label>
+
+        <label>Exam Name
+          <input id="paper-exam-name" type="text">
+        </label>
+
         <label class="full">QR URL <span class="opt">(used in PDF header and thumbnail)</span>
           <input id="paper-qr-url" type="text">
         </label>
+      </div>
+
+      <div id="paper-id-preview" class="id-preview" hidden>
+        <span class="id-preview-label">Next ID</span>
+        <strong id="paper-next-id">—</strong>
+        <span class="id-preview-issued" id="paper-issued-count"></span>
       </div>
 
       <label for="paper-input" class="paste-label">Paste MCQs</label>
@@ -77,8 +91,8 @@
         <dt>Questions</dt><dd id="sum-count">—</dd>
       </dl>
       <div class="actions">
-<button id="paper-open-pdf" class="secondary" type="button">Open PDF</button>
-<button id="paper-download-raster" class="secondary" type="button">Quick PDF</button>
+        <button id="paper-open-pdf" class="secondary" type="button">Open PDF</button>
+        <button id="paper-download-raster" class="secondary" type="button">Quick PDF</button>
         <button id="paper-thumb-btn" type="button">Create Thumbnail →</button>
       </div>
     </div>
@@ -100,19 +114,13 @@
     <details class="input-panel" open>
       <summary>Content Input — Auto-saves · Live preview</summary>
       <div class="input-grid">
-        <label>MT ID<input id="in-mtId" type="text"></label>
-        <label>Subject<input id="in-subject" type="text"></label>
-        <label class="full">Title<textarea id="in-title"></textarea><span class="hint">Use Enter for line break</span></label>
-        <label>Exam Type<input id="in-examType" type="text"></label>
-        <label>Questions<input id="in-questions" type="text"></label>
-        <label class="full">Exam Name<textarea id="in-examName"></textarea><span class="hint">Use Enter for line break</span></label>
         <label class="full">Question<textarea id="in-question"></textarea></label>
         <label>Option A<input id="in-optA" type="text"></label>
         <label>Option B<input id="in-optB" type="text"></label>
         <label>Option C<input id="in-optC" type="text"></label>
         <label>Option D<input id="in-optD" type="text"></label>
         <label>Time<input id="in-time" type="text"></label>
-        <label>QR URL<input id="in-url" type="text"></label>
+        <label>Marks<input id="in-marks" type="text"></label>
       </div>
     </details>
     <div class="preview-area">
@@ -120,7 +128,7 @@
         <div class="banner-inner">
           <div class="brand-row">
             <div class="brand">PrepareKora<span>.in</span></div>
-            <div class="test-id" data-bind="mtId">MT ID: MT/GK/0001</div>
+            <div class="test-id" data-bind="mtId">MT ID: MT-GK-003</div>
           </div>
           <div class="heading-row">
             <div class="heading-left"><small data-bind="subject">GENERAL KNOWLEDGE</small><h1 data-bind="title">Important<br>MCQs</h1></div>
@@ -139,6 +147,7 @@
           <div class="bottom-row">
             <div class="stat-card"><small>QUESTIONS</small><strong data-bind="questions">120</strong></div>
             <div class="stat-card"><small>TIME LIMIT</small><strong data-bind="time">30 Min</strong></div>
+            <div class="stat-card"><small>MARKS</small><strong data-bind="marks">50</strong></div>
             <div class="qr-area"><div class="qr-frame"><img class="qr-image" alt="QR Code"></div><div class="qr-caption">SCAN TO START</div></div>
           </div>
           <div class="footer"><strong>PrepareKora.in</strong><span>Learn · Practice · Succeed</span></div>
