@@ -1,7 +1,7 @@
 (function initState(global){
   'use strict';
 
-  const VERSION = 2;
+  const VERSION = 3;
   const KEYS = {
     serialPrefix: 'pk.mtSerial.',
     testData:     'pk.testData'
@@ -48,7 +48,7 @@
 
   function pad3(n){ return String(n).padStart(3, '0'); }
   function buildId(subject, serialNum){
-    return 'MT/' + subjectCode(subject) + '/' + pad3(serialNum);
+    return 'MT-' + subjectCode(subject) + '-' + pad3(serialNum);
   }
 
   function peekMTId(subject){
@@ -117,6 +117,7 @@
       title:           String(opts.title || '').trim() || (s + ' — MCQ Practice Paper'),
       examType:        String(opts.examType || '').trim(),
       examName:        String(opts.examName || '').trim(),
+      qrUrl:           String(opts.qrUrl || '').trim(),
       totalQuestions:  list.length,
       questions:       list,
       createdAt:       Date.now()
